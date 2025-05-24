@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/google/uuid"
+	"idm/inner/database"
+	"log"
 )
 
 func main() {
 	fmt.Println("Hello, Go.")
 
-	id := uuid.New()
-	fmt.Println("Generated UUID:", id.String())
+	// Подключаемся к БД
+	db := database.ConnectDb()
+	defer db.Close()
+
+	log.Println("DB connected")
 }
