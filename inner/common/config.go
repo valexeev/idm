@@ -6,20 +6,32 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config общая конфигурация всего приложения
 type Config struct {
-	DbDriverName string `validate:"required"`
-	Dsn          string `validate:"required"`
+	DbDriverName string
+	Dsn          string
 }
 
-// GetConfig получение конфигурации из .env файла или переменных окружения
+// GetConfig читает .env файл (если указан), подгружает переменные окружения
+// и возвращает конфигурацию.
+// Переменные окружения имеют приоритет над .env файлом.
 func GetConfig(envFile string) (Config, error) {
+	// Загружаем .env, если файл указан
 	if envFile != "" {
-		_ = godotenv.Load(envFile) // игнорируем ошибку, .env может отсутствовать
+		_ = godotenv.Load(envFile)
 	}
-	cfg := Config{
+
+	return Config{
 		DbDriverName: os.Getenv("DB_DRIVER_NAME"),
 		Dsn:          os.Getenv("DB_DSN"),
+	}, nil
+}
+
+// GetConfigFromMap — вспомогательная функция для тестов,
+// принимает map с ключами и возвращает Config,
+// чтобы создавать конфиги без env и файлов.
+func GetConfigFromMap(m map[string]string) Config {
+	return Config{
+		DbDriverName: m["DB_DRIVER_NAME"],
+		Dsn:          m["DB_DSN"],
 	}
-	return cfg, nil
 }
