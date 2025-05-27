@@ -13,11 +13,14 @@ type Config struct {
 }
 
 // GetConfig получение конфигурации из .env файла или переменных окружения
-func GetConfig(envFile string) Config {
-	_ = godotenv.Load(envFile)
-	var cfg = Config{
+func GetConfig(envFile string) (Config, error) {
+	err := godotenv.Load(envFile)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg := Config{
 		DbDriverName: os.Getenv("DB_DRIVER_NAME"),
 		Dsn:          os.Getenv("DB_DSN"),
 	}
-	return cfg
+	return cfg, nil
 }
