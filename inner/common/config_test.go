@@ -1,47 +1,121 @@
 package common_test
 
 import (
-	"idm/inner/common"
+	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"idm/inner/common"
 )
 
-func TestEmptyEnvAndNoEnvVars(t *testing.T) {
-	env := map[string]string{}
-	cfg := common.GetConfigFromMap(env)
-	assert.Equal(t, "", cfg.DbDriverName)
-	assert.Equal(t, "", cfg.Dsn)
+const (
+	dbDriverEnv = "DB_DRIVER_NAME"
+	dsnEnv      = "DSN"
+)
+
+// helper: сброс переменных окружения
+func unsetEnv() {
+	os.Unsetenv(dbDriverEnv)
+	os.Unsetenv(dsnEnv)
 }
 
-func TestEnvFileWithoutVarsButHasEnvVars(t *testing.T) {
-	env := map[string]string{
-		"DB_DRIVER_NAME": "postgres",
-		"DB_DSN":         "postgres://postgres:@localhost:5432/idm_service?sslmode=disable",
-	}
-	cfg := common.GetConfigFromMap(env)
-	assert.Equal(t, "postgres", cfg.DbDriverName)
-	assert.Equal(t, "postgres://postgres:@localhost:5432/idm_service?sslmode=disable", cfg.Dsn)
+// helper: установка переменных окружения
+func setEnv(driver, dsn string) {
+	_ = os.Setenv(dbDriverEnv, driver)
+	_ = os.Setenv(dsnEnv, dsn)
 }
 
-func TestEnvFileWithVarsAndNoEnvVars(t *testing.T) {
-	// В тестах без env, "имитация" загрузки из .env — просто передать значения
-	env := map[string]string{
-		"DB_DRIVER_NAME": "postgres",
-		"DB_DSN":         "host=127.0.0.1 port=5432 user=postgres password= dbname=idm_service sslmode=disable",
+// helper: создание временного .env-файла
+func writeTempEnvFile(content string) string {
+	tmpFile, err := os.CreateTemp("", ".env")
+	if err != nil {
+		panic("cannot create temp env file: " + err.Error())
 	}
-	cfg := common.GetConfigFromMap(env)
-	assert.Equal(t, "postgres", cfg.DbDriverName)
-	assert.Equal(t, "host=127.0.0.1 port=5432 user=postgres password= dbname=idm_service sslmode=disable", cfg.Dsn)
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		tmpFile.Close()
+		panic("cannot write to temp env file: " + err.Error())
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		panic("cannot close temp env file: " + err.Error())
+	}
+
+	return tmpFile.Name()
 }
 
-func TestEnvOverridesEnvFile(t *testing.T) {
-	// эмулируем приоритет env-переменных над .env: подаем только env-переменные
-	env := map[string]string{
-		"DB_DRIVER_NAME": "env_postgres",
-		"DB_DSN":         "env_dsn_value",
-	}
-	cfg := common.GetConfigFromMap(env)
-	assert.Equal(t, "env_postgres", cfg.DbDriverName)
-	assert.Equal(t, "env_dsn_value", cfg.Dsn)
+func Test_GetConfig_OnlyEnvVars(t *testing.T) {
+	unsetEnv()
+	setEnv("pgx", "postgres://user:pass@localhost/db")
+
+	cfg, err := common.GetConfig("")
+	require.NoError(t, err)
+	require.Equal(t, "pgx", cfg.DbDriverName)
+	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
+
+	unsetEnv()
+}
+
+func Test_GetConfig_EmptyEverything(t *testing.T) {
+	unsetEnv()
+	cfg, err := common.GetConfig("")
+	require.NoError(t, err)
+	require.Equal(t, "", cfg.DbDriverName)
+	require.Equal(t, "", cfg.Dsn)
+}
+
+func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
+	unsetEnv()
+
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDSN=dotenv_dsn\n")
+	defer os.Remove(envFile)
+
+	setEnv("env_driver", "env_dsn")
+
+	cfg, err := common.GetConfig(envFile)
+	require.NoError(t, err)
+	require.Equal(t, "env_driver", cfg.DbDriverName)
+	require.Equal(t, "env_dsn", cfg.Dsn)
+
+	unsetEnv()
+}
+
+func Test_GetConfig_OnlyDotEnv(t *testing.T) {
+	unsetEnv()
+
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDSN=postgres://user:pass@localhost/db\n")
+	defer os.Remove(envFile)
+
+	cfg, err := common.GetConfig(envFile)
+	require.NoError(t, err)
+	require.Equal(t, "pgx", cfg.DbDriverName)
+	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
+}
+
+func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
+	unsetEnv()
+
+	envFile := writeTempEnvFile("SOME_VAR=123\n")
+	defer os.Remove(envFile)
+
+	cfg, err := common.GetConfig(envFile)
+	require.NoError(t, err)
+	require.Equal(t, "", cfg.DbDriverName)
+	require.Equal(t, "", cfg.Dsn)
+}
+
+func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
+	unsetEnv()
+	setEnv("pgx", "postgres://user:pass@localhost/db")
+
+	envFile := writeTempEnvFile("SOME_VAR=123\n")
+	defer os.Remove(envFile)
+
+	cfg, err := common.GetConfig(envFile)
+	require.NoError(t, err)
+	require.Equal(t, "pgx", cfg.DbDriverName)
+	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
+
+	unsetEnv()
 }
