@@ -13,7 +13,10 @@ var DB *sqlx.DB
 
 // ConnectDb получить конфиг и подключиться с ним к базе данных
 func ConnectDb() *sqlx.DB {
-	cfg := common.GetConfig(".env")
+	cfg, err := common.GetConfig(".env")
+	if err != nil {
+		panic("Ошибка при чтении конфига: " + err.Error())
+	}
 	return ConnectDbWithCfg(cfg)
 }
 
