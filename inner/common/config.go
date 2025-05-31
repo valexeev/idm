@@ -20,6 +20,6 @@ func GetConfig(envFile string) (Config, error) {
 
 	return Config{
 		DbDriverName: os.Getenv("DB_DRIVER_NAME"),
-		Dsn:          os.Getenv("DSN"),
+		Dsn:          os.Getenv("DB_DSN"),
 	}, nil
 }
