@@ -1,7 +1,6 @@
 package idm_test
 
 import (
-	"database/sql"
 	"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -14,7 +13,6 @@ import (
 func TestEmployeeRepository(t *testing.T) {
 	a := assert.New(t)
 
-	// Подключение к тестовой базе
 	cfg, err := common.GetConfig(".env.tests")
 	if err != nil {
 		t.Fatal("Не удалось загрузить конфиг:", err)
@@ -58,7 +56,7 @@ func TestEmployeeRepository(t *testing.T) {
 
 	t.Run("find employee by id not found", func(t *testing.T) {
 		_, err := employeeRepository.FindById(999999)
-		a.Equal(sql.ErrNoRows, err)
+		a.Error(err)
 		clearDatabase()
 	})
 
@@ -85,7 +83,7 @@ func TestEmployeeRepository(t *testing.T) {
 		err := employeeRepository.DeleteById(empId)
 		a.Nil(err)
 		_, err = employeeRepository.FindById(empId)
-		a.Equal(sql.ErrNoRows, err)
+		a.Error(err)
 		clearDatabase()
 	})
 

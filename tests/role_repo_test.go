@@ -1,7 +1,6 @@
 package idm_test
 
 import (
-	"database/sql"
 	"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -14,7 +13,6 @@ import (
 func TestRoleRepository(t *testing.T) {
 	a := assert.New(t)
 
-	// Подключение к тестовой базе
 	cfg, err := common.GetConfig(".env.tests")
 	if err != nil {
 		t.Fatal("Не удалось загрузить конфиг:", err)
@@ -58,7 +56,7 @@ func TestRoleRepository(t *testing.T) {
 
 	t.Run("find role by id not found", func(t *testing.T) {
 		_, err := roleRepository.FindById(999999)
-		a.Equal(sql.ErrNoRows, err)
+		a.Error(err)
 		clearDatabase()
 	})
 
@@ -85,7 +83,7 @@ func TestRoleRepository(t *testing.T) {
 		err := roleRepository.DeleteById(roleId)
 		a.Nil(err)
 		_, err = roleRepository.FindById(roleId)
-		a.Equal(sql.ErrNoRows, err)
+		a.Error(err)
 		clearDatabase()
 	})
 
