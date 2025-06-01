@@ -11,7 +11,7 @@ import (
 
 const (
 	dbDriverEnv = "DB_DRIVER_NAME"
-	dsnEnv      = "DSN"
+	dsnEnv      = "DB_DSN"
 )
 
 // helper: сброс переменных окружения
@@ -68,7 +68,7 @@ func Test_GetConfig_EmptyEverything(t *testing.T) {
 func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 	unsetEnv()
 
-	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDSN=dotenv_dsn\n")
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDB_DSN=dotenv_dsn\n")
 	defer os.Remove(envFile)
 
 	setEnv("env_driver", "env_dsn")
@@ -84,7 +84,7 @@ func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	unsetEnv()
 
-	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDSN=postgres://user:pass@localhost/db\n")
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDB_DSN=postgres://user:pass@localhost/db\n")
 	defer os.Remove(envFile)
 
 	cfg, err := common.GetConfig(envFile)
