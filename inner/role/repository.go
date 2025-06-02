@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type RoleRepository struct {
@@ -38,7 +39,7 @@ func (r *RoleRepository) FindAll() (res []RoleEntity, err error) {
 
 func (r *RoleRepository) FindByIds(ids []int64) (res []RoleEntity, err error) {
 	query := `select * from role where id = any($1)`
-	err = r.db.Select(&res, query, ids)
+	err = r.db.Select(&res, query, pq.Array(ids))
 	return res, err
 }
 
@@ -48,6 +49,6 @@ func (r *RoleRepository) DeleteById(id int64) error {
 }
 
 func (r *RoleRepository) DeleteByIds(ids []int64) error {
-	_, err := r.db.Exec("delete from role where id = any($1)", ids)
+	_, err := r.db.Exec("delete from role where id = any($1)", pq.Array(ids))
 	return err
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type EmployeeRepository struct {
@@ -40,7 +41,7 @@ func (r *EmployeeRepository) FindAll() ([]EmployeeEntity, error) {
 func (r *EmployeeRepository) FindByIds(ids []int64) ([]EmployeeEntity, error) {
 	query := `SELECT * FROM employee WHERE id = ANY($1)`
 	var res []EmployeeEntity
-	err := r.db.Select(&res, query, ids)
+	err := r.db.Select(&res, query, pq.Array(ids))
 	return res, err
 }
 
@@ -50,6 +51,6 @@ func (r *EmployeeRepository) DeleteById(id int64) error {
 }
 
 func (r *EmployeeRepository) DeleteByIds(ids []int64) error {
-	_, err := r.db.Exec("DELETE FROM employee WHERE id = ANY($1)", ids)
+	_, err := r.db.Exec("DELETE FROM employee WHERE id = ANY($1)", pq.Array(ids))
 	return err
 }

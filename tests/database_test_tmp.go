@@ -10,7 +10,7 @@ import (
 
 func TestEnvFileExists(t *testing.T) {
 	dir, _ := os.Getwd()
-	fmt.Println("Current dir:", dir) // проверить откуда запускается тест
+	fmt.Println("Current dir:", dir)
 
 	_, err := os.Stat("../.env")
 	assert.NoError(t, err, ".env файл должен быть в корне проекта")
