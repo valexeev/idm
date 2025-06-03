@@ -32,13 +32,13 @@ func TestEmployeeRepository(t *testing.T) {
 		}
 	}()
 
-	var employeeRepository = employee.NewEmployeeRepository(db)
-	var roleRepository = role.NewRoleRepository(db)
+	var employeeRepository = employee.NewRepository(db)
+	var roleRepository = role.NewRepository(db)
 	var fixture, fixtureErr = NewFixture(employeeRepository, roleRepository, db)
 	a.Nil(fixtureErr)
 
 	t.Run("add employee", func(t *testing.T) {
-		emp := &employee.EmployeeEntity{Name: "John Doe"}
+		emp := &employee.Entity{Name: "John Doe"}
 		err := employeeRepository.Add(emp)
 		a.Nil(err)
 		a.Greater(emp.Id, int64(0))

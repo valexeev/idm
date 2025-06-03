@@ -11,13 +11,13 @@ import (
 
 // Fixture — вспомогательная структура для подготовки данных в тестах
 type Fixture struct {
-	employees *employee.EmployeeRepository
-	roles     *role.RoleRepository
+	employees *employee.Repository
+	roles     *role.Repository
 	db        *sqlx.DB
 }
 
 // NewFixture — создаёт фикстуру и инициализирует таблицы, если нужно
-func NewFixture(employees *employee.EmployeeRepository, roles *role.RoleRepository, db *sqlx.DB) (*Fixture, error) {
+func NewFixture(employees *employee.Repository, roles *role.Repository, db *sqlx.DB) (*Fixture, error) {
 	f := &Fixture{employees: employees, roles: roles, db: db}
 	if err := f.setupDatabase(); err != nil {
 		return nil, fmt.Errorf("setup database: %w", err)
@@ -76,7 +76,7 @@ func (f *Fixture) ClearTable(table string) error {
 // Employee — создаёт сотрудника, возвращает ID
 func (f *Fixture) Employee(name string) (int64, error) {
 	now := time.Now()
-	e := employee.EmployeeEntity{Name: name, CreatedAt: now, UpdatedAt: now}
+	e := employee.Entity{Name: name, CreatedAt: now, UpdatedAt: now}
 	if err := f.employees.Add(&e); err != nil {
 		return 0, err
 	}
@@ -86,7 +86,7 @@ func (f *Fixture) Employee(name string) (int64, error) {
 // Role — создаёт роль, возвращает ID
 func (f *Fixture) Role(name string) (int64, error) {
 	now := time.Now()
-	r := role.RoleEntity{Name: name, CreatedAt: now, UpdatedAt: now}
+	r := role.Entity{Name: name, CreatedAt: now, UpdatedAt: now}
 	if err := f.roles.Add(&r); err != nil {
 		return 0, err
 	}
