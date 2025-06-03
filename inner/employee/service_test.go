@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -42,6 +43,24 @@ func (m *MockRepo) DeleteById(id int64) error {
 
 func (m *MockRepo) DeleteByIds(ids []int64) error {
 	args := m.Called(ids)
+	return args.Error(0)
+}
+
+func (m *MockRepo) BeginTransaction() (*sqlx.Tx, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*sqlx.Tx), args.Error(1)
+}
+
+func (m *MockRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	args := m.Called(tx, name)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockRepo) AddTx(tx *sqlx.Tx, e *Entity) error {
+	args := m.Called(tx, e)
 	return args.Error(0)
 }
 
@@ -277,6 +296,18 @@ func (s *StubRepo) DeleteByIds(ids []int64) error {
 	return errors.New("not implemented")
 }
 
+func (s *StubRepo) BeginTransaction() (*sqlx.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *StubRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (s *StubRepo) AddTx(tx *sqlx.Tx, e *Entity) error {
+	return errors.New("not implemented")
+}
+
 func TestEmployeeService_FindById_WithStub(t *testing.T) {
 	a := assert.New(t)
 
@@ -404,5 +435,153 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 		a.NotNil(err)
 		a.Contains(err.Error(), "error deleting employees by ids")
 		a.True(repo.AssertNumberOfCalls(t, "DeleteByIds", 1))
+	})
+}
+
+// MockTransaction представляет mock объект транзакции
+type MockTransaction struct {
+	mock.Mock
+}
+
+func (m *MockTransaction) Commit() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockTransaction) Rollback() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// NewMockTransaction создает новую mock транзакцию
+func NewMockTransaction() *MockTransaction {
+	return &MockTransaction{}
+}
+
+// Тесты для AddTransactional
+func TestEmployeeService_AddTransactional(t *testing.T) {
+	a := assert.New(t)
+
+	t.Run("should return error when transaction creation fails", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		// Настраиваем mock для ошибки создания транзакции
+		repo.On("BeginTransaction").Return((*sqlx.Tx)(nil), errors.New("failed to create transaction"))
+
+		// Вызываем тестируемый метод
+		response, err := svc.AddTransactional("John Doe")
+
+		// Проверяем результат
+		a.Empty(response)
+		a.NotNil(err)
+		a.Contains(err.Error(), "error creating transaction")
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 1))
+	})
+
+	t.Run("should return error when checking employee existence fails", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		tx := (*sqlx.Tx)(nil) // Упрощенный mock для тестирования
+
+		// Настраиваем mock
+		repo.On("BeginTransaction").Return(tx, nil)
+		repo.On("FindByNameTx", tx, "John Doe").Return(false, errors.New("database error"))
+
+		// Вызываем тестируемый метод
+		response, err := svc.AddTransactional("John Doe")
+
+		// Проверяем результат
+		a.Empty(response)
+		a.NotNil(err)
+		a.Contains(err.Error(), "error checking employee existence")
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 1))
+		a.True(repo.AssertNumberOfCalls(t, "FindByNameTx", 1))
+	})
+
+	t.Run("should return error when employee with same name already exists", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		tx := (*sqlx.Tx)(nil)
+
+		// Настраиваем mock
+		repo.On("BeginTransaction").Return(tx, nil)
+		repo.On("FindByNameTx", tx, "John Doe").Return(true, nil) // сотрудник существует
+
+		// Вызываем тестируемый метод
+		response, err := svc.AddTransactional("John Doe")
+
+		// Проверяем результат
+		a.Empty(response)
+		a.NotNil(err)
+		a.Contains(err.Error(), "employee with name 'John Doe' already exists")
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 1))
+		a.True(repo.AssertNumberOfCalls(t, "FindByNameTx", 1))
+	})
+
+	t.Run("should return error when adding employee fails", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		tx := (*sqlx.Tx)(nil)
+
+		// Настраиваем mock
+		repo.On("BeginTransaction").Return(tx, nil)
+		repo.On("FindByNameTx", tx, "John Doe").Return(false, nil) // сотрудника нет
+		repo.On("AddTx", tx, mock.AnythingOfType("*employee.Entity")).Return(errors.New("insert error"))
+
+		// Вызываем тестируемый метод
+		response, err := svc.AddTransactional("John Doe")
+
+		// Проверяем результат
+		a.Empty(response)
+		a.NotNil(err)
+		a.Contains(err.Error(), "error adding employee")
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 1))
+		a.True(repo.AssertNumberOfCalls(t, "FindByNameTx", 1))
+		a.True(repo.AssertNumberOfCalls(t, "AddTx", 1))
+	})
+
+	t.Run("should successfully create new employee", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		tx := (*sqlx.Tx)(nil)
+
+		// Настраиваем mock
+		repo.On("BeginTransaction").Return(tx, nil)
+		repo.On("FindByNameTx", tx, "John Doe").Return(false, nil) // сотрудника нет
+		repo.On("AddTx", tx, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
+			entity := args.Get(1).(*Entity)
+			entity.Id = 1 // симулируем присвоение ID в БД
+		})
+
+		// Вызываем тестируемый метод
+		response, err := svc.AddTransactional("John Doe")
+
+		// Проверяем результат
+		a.NoError(err)
+		a.Equal(int64(1), response.Id)
+		a.Equal("John Doe", response.Name)
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 1))
+		a.True(repo.AssertNumberOfCalls(t, "FindByNameTx", 1))
+		a.True(repo.AssertNumberOfCalls(t, "AddTx", 1))
+	})
+
+	t.Run("should return error for empty name", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := NewService(repo)
+
+		// Вызываем с пустым именем
+		response, err := svc.AddTransactional("")
+
+		// Проверяем результат
+		a.Empty(response)
+		a.NotNil(err)
+		a.Contains(err.Error(), "name cannot be empty")
+		// Транзакция не должна начинаться при валидации
+		a.True(repo.AssertNumberOfCalls(t, "BeginTransaction", 0))
 	})
 }

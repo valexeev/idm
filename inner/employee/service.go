@@ -3,6 +3,8 @@ package employee
 import (
 	"fmt"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // Service структура, которая инкапсулирует бизнес-логику
@@ -18,6 +20,79 @@ type Repo interface {
 	FindByIds(ids []int64) ([]Entity, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
+	BeginTransaction() (*sqlx.Tx, error)
+	FindByNameTx(tx *sqlx.Tx, name string) (bool, error)
+	AddTx(tx *sqlx.Tx, e *Entity) error
+}
+
+// AddTransactional транзакционно добавляет нового сотрудника
+// Проверяет наличие сотрудника с таким именем и создает нового, если его нет
+func (svc *Service) AddTransactional(name string) (response Response, err error) {
+	if name == "" {
+		return Response{}, fmt.Errorf("employee name cannot be empty")
+	}
+
+	// Начинаем транзакцию
+	tx, err := svc.repo.BeginTransaction()
+
+	// Отложенная функция завершения транзакции
+	defer func() {
+		// Проверяем, что транзакция была создана успешно
+		if tx == nil {
+			return
+		}
+
+		// Проверяем, не было ли паники
+		if r := recover(); r != nil {
+			err = fmt.Errorf("creating employee panic: %v", r)
+			// Если была паника, то откатываем транзакцию
+			errTx := tx.Rollback()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: rolling back transaction errors: %w, %w", err, errTx)
+			}
+		} else if err != nil {
+			// Если произошла другая ошибка (не паника), то откатываем транзакцию
+			errTx := tx.Rollback()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: rolling back transaction errors: %w, %w", err, errTx)
+			}
+		} else {
+			// Если ошибок нет, то коммитим транзакцию
+			errTx := tx.Commit()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: commiting transaction error: %w", errTx)
+			}
+		}
+	}()
+
+	if err != nil {
+		return Response{}, fmt.Errorf("error creating transaction: %w", err)
+	}
+
+	// Проверяем, существует ли сотрудник с таким именем
+	exists, err := svc.repo.FindByNameTx(tx, name)
+	if err != nil {
+		return Response{}, fmt.Errorf("error checking employee existence: %w", err)
+	}
+
+	if exists {
+		return Response{}, fmt.Errorf("employee with name '%s' already exists", name)
+	}
+
+	// Создаем нового сотрудника
+	now := time.Now()
+	entity := &Entity{
+		Name:      name,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err = svc.repo.AddTx(tx, entity)
+	if err != nil {
+		return Response{}, fmt.Errorf("error adding employee: %w", err)
+	}
+
+	return entity.toResponse(), nil
 }
 
 // NewService функция-конструктор для Service
