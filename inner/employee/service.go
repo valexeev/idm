@@ -27,6 +27,7 @@ type Repo interface {
 
 // AddTransactional транзакционно добавляет нового сотрудника
 // Проверяет наличие сотрудника с таким именем и создает нового, если его нет
+
 func (svc *Service) AddTransactional(name string) (response Response, err error) {
 	if name == "" {
 		return Response{}, fmt.Errorf("employee name cannot be empty")
@@ -34,14 +35,12 @@ func (svc *Service) AddTransactional(name string) (response Response, err error)
 
 	// Начинаем транзакцию
 	tx, err := svc.repo.BeginTransaction()
+	if err != nil {
+		return Response{}, fmt.Errorf("error creating transaction: %w", err)
+	}
 
 	// Отложенная функция завершения транзакции
 	defer func() {
-		// Проверяем, что транзакция была создана успешно
-		if tx == nil {
-			return
-		}
-
 		// Проверяем, не было ли паники
 		if r := recover(); r != nil {
 			err = fmt.Errorf("creating employee panic: %v", r)
@@ -61,13 +60,10 @@ func (svc *Service) AddTransactional(name string) (response Response, err error)
 			errTx := tx.Commit()
 			if errTx != nil {
 				err = fmt.Errorf("creating employee: commiting transaction error: %w", errTx)
+				response = Response{} // Reset response to empty value on commit error
 			}
 		}
 	}()
-
-	if err != nil {
-		return Response{}, fmt.Errorf("error creating transaction: %w", err)
-	}
 
 	// Проверяем, существует ли сотрудник с таким именем
 	exists, err := svc.repo.FindByNameTx(tx, name)
