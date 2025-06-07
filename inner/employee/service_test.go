@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -42,6 +43,24 @@ func (m *MockRepo) DeleteById(id int64) error {
 
 func (m *MockRepo) DeleteByIds(ids []int64) error {
 	args := m.Called(ids)
+	return args.Error(0)
+}
+
+func (m *MockRepo) BeginTransaction() (*sqlx.Tx, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*sqlx.Tx), args.Error(1)
+}
+
+func (m *MockRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	args := m.Called(tx, name)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockRepo) AddTx(tx *sqlx.Tx, e *Entity) error {
+	args := m.Called(tx, e)
 	return args.Error(0)
 }
 
@@ -274,6 +293,18 @@ func (s *StubRepo) DeleteById(id int64) error {
 }
 
 func (s *StubRepo) DeleteByIds(ids []int64) error {
+	return errors.New("not implemented")
+}
+
+func (s *StubRepo) BeginTransaction() (*sqlx.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *StubRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (s *StubRepo) AddTx(tx *sqlx.Tx, e *Entity) error {
 	return errors.New("not implemented")
 }
 
