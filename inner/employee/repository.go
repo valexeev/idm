@@ -47,3 +47,25 @@ func (r *Repository) DeleteByIds(ids []int64) error {
 	_, err := r.db.Exec("DELETE FROM employee WHERE id = ANY($1)", pq.Array(ids))
 	return err
 }
+
+// BeginTransaction начинает новую транзакцию
+func (r *Repository) BeginTransaction() (*sqlx.Tx, error) {
+	return r.db.Beginx()
+}
+
+// FindByNameTx проверяет наличие в базе данных сотрудника с заданным именем в рамках транзакции
+func (r *Repository) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	var exists bool
+	err := tx.Get(
+		&exists,
+		"SELECT EXISTS(SELECT 1 FROM employee WHERE name = $1)",
+		name,
+	)
+	return exists, err
+}
+
+// AddTx добавляет нового сотрудника в рамках транзакции
+func (r *Repository) AddTx(tx *sqlx.Tx, e *Entity) error {
+	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
+	return tx.QueryRow(query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
+}
