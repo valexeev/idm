@@ -2,6 +2,7 @@ package employee
 
 import (
 	"fmt"
+	"idm/inner/common"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -9,7 +10,8 @@ import (
 
 // Service структура, которая инкапсулирует бизнес-логику
 type Service struct {
-	repo Repo
+	repo      Repo
+	validator Validator
 }
 
 // Repo интерфейс репозитория для сотрудников
@@ -25,18 +27,23 @@ type Repo interface {
 	AddTx(tx *sqlx.Tx, e *Entity) error
 }
 
+type Validator interface {
+	Validate(any) error
+}
+
 // AddTransactional транзакционно добавляет нового сотрудника
 // Проверяет наличие сотрудника с таким именем и создает нового, если его нет
 
-func (svc *Service) AddTransactional(name string) (response Response, err error) {
-	if name == "" {
-		return Response{}, fmt.Errorf("employee name cannot be empty")
+func (svc *Service) AddTransactional(request AddEmployeeRequest) (response Response, err error) {
+	err = svc.validator.Validate(request)
+	if err != nil {
+		return Response{}, common.RequestValidationError{Message: err.Error()}
 	}
 
 	// Начинаем транзакцию
 	tx, err := svc.repo.BeginTransaction()
 	if err != nil {
-		return Response{}, fmt.Errorf("error creating transaction: %w", err)
+		return Response{}, common.TransactionError{Message: "error creating transaction", Err: err}
 	}
 
 	// Отложенная функция завершения транзакции
@@ -53,7 +60,7 @@ func (svc *Service) AddTransactional(name string) (response Response, err error)
 			// Если произошла другая ошибка (не паника), то откатываем транзакцию
 			errTx := tx.Rollback()
 			if errTx != nil {
-				err = fmt.Errorf("creating employee: rolling back transaction errors: %w, %w", err, errTx)
+				err = common.TransactionError{Message: "rolling back transaction failed", Err: errTx}
 			}
 		} else {
 			// Если ошибок нет, то коммитим транзакцию
@@ -66,19 +73,19 @@ func (svc *Service) AddTransactional(name string) (response Response, err error)
 	}()
 
 	// Проверяем, существует ли сотрудник с таким именем
-	exists, err := svc.repo.FindByNameTx(tx, name)
+	exists, err := svc.repo.FindByNameTx(tx, request.Name)
 	if err != nil {
 		return Response{}, fmt.Errorf("error checking employee existence: %w", err)
 	}
 
 	if exists {
-		return Response{}, fmt.Errorf("employee with name '%s' already exists", name)
+		return Response{}, common.AlreadyExistsError{Message: fmt.Sprintf("employee with name '%s' already exists", request.Name)}
 	}
 
 	// Создаем нового сотрудника
 	now := time.Now()
 	entity := &Entity{
-		Name:      name,
+		Name:      request.Name,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -92,21 +99,22 @@ func (svc *Service) AddTransactional(name string) (response Response, err error)
 }
 
 // NewService функция-конструктор для Service
-func NewService(repo Repo) *Service {
+func NewService(repo Repo, validator Validator) *Service {
 	return &Service{
-		repo: repo,
+		repo:      repo,
+		validator: validator,
 	}
 }
 
 // FindById возвращает сотрудника по ID
 func (svc *Service) FindById(id int64) (Response, error) {
 	if id <= 0 {
-		return Response{}, fmt.Errorf("invalid employee id: %d", id)
+		return Response{}, common.RequestValidationError{Message: fmt.Sprintf("invalid employee id: %d", id)}
 	}
 
 	entity, err := svc.repo.FindById(id)
 	if err != nil {
-		return Response{}, fmt.Errorf("error finding employee with id %d: %w", id, err)
+		return Response{}, common.RepositoryError{Message: fmt.Sprintf("error finding employee with id %d", id), Err: err}
 	}
 
 	return entity.toResponse(), nil
@@ -115,7 +123,7 @@ func (svc *Service) FindById(id int64) (Response, error) {
 // Add добавляет нового сотрудника
 func (svc *Service) Add(name string) (Response, error) {
 	if name == "" {
-		return Response{}, fmt.Errorf("employee name cannot be empty")
+		return Response{}, common.RequestValidationError{Message: "employee name cannot be empty"}
 	}
 
 	now := time.Now()
