@@ -5,6 +5,7 @@ import (
 	"idm/inner/common"
 	"idm/inner/web"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber"
 )
@@ -44,11 +45,26 @@ func (c *Controller) RegisterRoutes() {
 	c.server.GroupApiV1.Delete("/employees", c.DeleteEmployeesByIds)
 }
 
+// validateEmployeeName валидирует имя сотрудника
+func validateEmployeeName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("employee name cannot be empty")
+	}
+	return nil
+}
+
 // функция-хендлер для создания сотрудника (транзакционно)
 func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) {
 	// анмаршалим JSON body запроса в структуру AddEmployeeRequest
 	var request AddEmployeeRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return
+	}
+
+	// валидация имени
+	if err := validateEmployeeName(request.Name); err != nil {
 		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		return
 	}
@@ -84,6 +100,12 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) {
 	// анмаршалим JSON body запроса в структуру AddEmployeeRequest
 	var request AddEmployeeRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return
+	}
+
+	// валидация имени
+	if err := validateEmployeeName(request.Name); err != nil {
 		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		return
 	}
