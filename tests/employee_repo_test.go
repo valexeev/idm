@@ -12,11 +12,7 @@ import (
 
 func TestEmployeeRepository(t *testing.T) {
 	a := assert.New(t)
-
-	cfg, err := common.GetConfig(".env.tests")
-	if err != nil {
-		t.Fatal("Не удалось загрузить конфиг:", err)
-	}
+	cfg := common.GetConfig(".env.tests")
 
 	var db = database.ConnectDbWithCfg(cfg)
 	defer db.Close()
