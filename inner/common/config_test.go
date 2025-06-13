@@ -49,8 +49,7 @@ func Test_GetConfig_OnlyEnvVars(t *testing.T) {
 	unsetEnv()
 	setEnv("pgx", "postgres://user:pass@localhost/db")
 
-	cfg, err := common.GetConfig("")
-	require.NoError(t, err)
+	cfg := common.GetConfig("")
 	require.Equal(t, "pgx", cfg.DbDriverName)
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 
@@ -59,8 +58,7 @@ func Test_GetConfig_OnlyEnvVars(t *testing.T) {
 
 func Test_GetConfig_EmptyEverything(t *testing.T) {
 	unsetEnv()
-	cfg, err := common.GetConfig("")
-	require.NoError(t, err)
+	cfg := common.GetConfig("")
 	require.Equal(t, "", cfg.DbDriverName)
 	require.Equal(t, "", cfg.Dsn)
 }
@@ -73,8 +71,7 @@ func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 
 	setEnv("env_driver", "env_dsn")
 
-	cfg, err := common.GetConfig(envFile)
-	require.NoError(t, err)
+	cfg := common.GetConfig(envFile)
 	require.Equal(t, "env_driver", cfg.DbDriverName)
 	require.Equal(t, "env_dsn", cfg.Dsn)
 
@@ -87,8 +84,7 @@ func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDB_DSN=postgres://user:pass@localhost/db\n")
 	defer os.Remove(envFile)
 
-	cfg, err := common.GetConfig(envFile)
-	require.NoError(t, err)
+	cfg := common.GetConfig(envFile)
 	require.Equal(t, "pgx", cfg.DbDriverName)
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 }
@@ -99,8 +95,7 @@ func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
 	envFile := writeTempEnvFile("SOME_VAR=123\n")
 	defer os.Remove(envFile)
 
-	cfg, err := common.GetConfig(envFile)
-	require.NoError(t, err)
+	cfg := common.GetConfig(envFile)
 	require.Equal(t, "", cfg.DbDriverName)
 	require.Equal(t, "", cfg.Dsn)
 }
@@ -112,8 +107,7 @@ func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
 	envFile := writeTempEnvFile("SOME_VAR=123\n")
 	defer os.Remove(envFile)
 
-	cfg, err := common.GetConfig(envFile)
-	require.NoError(t, err)
+	cfg := common.GetConfig(envFile)
 	require.Equal(t, "pgx", cfg.DbDriverName)
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 
