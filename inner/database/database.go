@@ -11,10 +11,7 @@ import (
 var DB *sqlx.DB
 
 func ConnectDb() *sqlx.DB {
-	cfg, err := common.GetConfig(".env")
-	if err != nil {
-		panic("Ошибка при чтении конфига: " + err.Error())
-	}
+	cfg := common.GetConfig(".env")
 	return ConnectDbWithCfg(cfg)
 }
 

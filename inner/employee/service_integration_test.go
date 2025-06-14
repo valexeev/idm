@@ -2,6 +2,7 @@ package employee
 
 import (
 	"errors"
+	"idm/inner/common/validator"
 	"testing"
 	"time"
 
@@ -19,10 +20,12 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// No mock expectations needed since we return early for empty name
-		response, err := svc.AddTransactional("")
+		request := AddEmployeeRequest{Name: ""}
+		response, err := svc.AddTransactional(request)
 
 		// Debug logging
 		t.Logf("Response: %+v", response)
@@ -31,7 +34,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		// Verify empty response
 		expectedResponse := Response{}
 		a.Equal(expectedResponse, response, "Response should be empty for empty name")
-		
+
 		// Verify error exists and contains expected message
 		a.Error(err, "Should return error for empty name")
 		if err != nil {
@@ -50,7 +53,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Настраиваем mock
 		mock.ExpectBegin()
@@ -62,7 +66,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 		mock.ExpectCommit()
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.NoError(err)
 		a.Equal(int64(1), response.Id)
@@ -79,7 +84,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectBegin()
 		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM employee WHERE name = \$1\)`).
@@ -87,7 +93,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 		mock.ExpectRollback()
 
-		response, err := svc.AddTransactional("Existing Employee")
+		request := AddEmployeeRequest{Name: "Existing Employee"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -104,7 +111,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectBegin()
 		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM employee WHERE name = \$1\)`).
@@ -115,7 +123,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnError(errors.New("insert failed"))
 		mock.ExpectRollback()
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -132,7 +141,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectBegin()
 		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM employee WHERE name = \$1\)`).
@@ -143,7 +153,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 		mock.ExpectCommit().WillReturnError(errors.New("commit failed"))
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -160,12 +171,14 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Настраиваем ошибку при начале транзакции
 		mock.ExpectBegin().WillReturnError(errors.New("failed to begin transaction"))
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -182,7 +195,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectBegin()
 		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM employee WHERE name = \$1\)`).
@@ -190,7 +204,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnError(errors.New("database connection error"))
 		mock.ExpectRollback()
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -207,7 +222,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectBegin()
 		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM employee WHERE name = \$1\)`).
@@ -218,7 +234,8 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 			WillReturnError(errors.New("insert failed"))
 		mock.ExpectRollback().WillReturnError(errors.New("rollback failed"))
 
-		response, err := svc.AddTransactional("John Doe")
+		request := AddEmployeeRequest{Name: "John Doe"}
+		response, err := svc.AddTransactional(request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -239,7 +256,8 @@ func TestEmployeeService_NonTransactionalMethods_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Use actual time values instead of sqlmock.AnyArg()
 		createdAt := time.Date(2025, 6, 7, 10, 0, 0, 0, time.UTC)
@@ -267,7 +285,8 @@ func TestEmployeeService_NonTransactionalMethods_WithSqlMock(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		mock.ExpectQuery(`INSERT INTO employee \(name, created_at, updated_at\) VALUES \(\$1, \$2, \$3\) RETURNING id`).
 			WithArgs("John Doe", sqlmock.AnyArg(), sqlmock.AnyArg()).
