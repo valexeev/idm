@@ -26,3 +26,5 @@ go.work.sum
 
 # specific macOs files
 .DS_Store
+
+.idea/

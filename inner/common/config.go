@@ -1,25 +1,42 @@
 package common
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
 
+// Config общая конфигурация всего приложения
 type Config struct {
-	DbDriverName string
-	Dsn          string
+	DbDriverName string `validate:"required"`
+	Dsn          string `validate:"required"`
+	AppName      string `validate:"required"`
+	AppVersion   string `validate:"required"`
 }
 
-func GetConfig(envFile string) (Config, error) {
-	if envFile != "" {
-		if err := godotenv.Load(envFile); err != nil {
-			return Config{}, err
-		}
+// GetConfig получение конфигурации из .env файла или переменных окружения
+func GetConfig(envFile string) Config {
+	var err = godotenv.Load(envFile)
+	// если нет файла, то залогируем это и попробуем получить конфиг из переменных окружения
+	if err != nil {
+		fmt.Printf("Error loading .env file: %v\n", err)
 	}
-
-	return Config{
+	var cfg = Config{
 		DbDriverName: os.Getenv("DB_DRIVER_NAME"),
 		Dsn:          os.Getenv("DB_DSN"),
-	}, nil
+		AppName:      os.Getenv("APP_NAME"),
+		AppVersion:   os.Getenv("APP_VERSION"),
+	}
+	err = validator.New().Struct(cfg)
+	if err != nil {
+		var validateErrs validator.ValidationErrors
+		if errors.As(err, &validateErrs) {
+			// если конфиг не прошел валидацию, то паникуем
+			panic(fmt.Sprintf("config validation error: %v", err))
+		}
+	}
+	return cfg
 }
