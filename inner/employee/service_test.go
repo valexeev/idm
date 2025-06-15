@@ -3,6 +3,7 @@ package employee
 import (
 	"errors"
 	"fmt"
+	"idm/inner/common/validator"
 	"testing"
 	"time"
 
@@ -70,7 +71,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 	t.Run("should return found employee", func(t *testing.T) {
 		// Создаем mock репозитория
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Тестовые данные
 		entity := Entity{
@@ -95,7 +97,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 
 	t.Run("should return error for invalid id", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Тестируем валидацию
 		response, err := svc.FindById(0)
@@ -108,7 +111,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Тестовые данные
 		repoErr := errors.New("database error")
@@ -134,7 +138,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should add employee successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Настраиваем mock - при вызове Add модифицируем Entity
 		repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
@@ -154,7 +159,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should return error for empty name", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Вызываем с пустым именем
 		response, err := svc.Add("")
@@ -168,7 +174,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
 		repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(repoErr)
@@ -189,8 +196,8 @@ func TestEmployeeService_FindAll(t *testing.T) {
 
 	t.Run("should return all employees", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
-
+		validator := validator.New()
+		svc := NewService(repo, validator)
 		// Тестовые данные
 		entities := []Entity{
 			{Id: 1, Name: "John Doe", CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -212,7 +219,8 @@ func TestEmployeeService_FindAll(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
 		repo.On("FindAll").Return([]Entity{}, repoErr)
@@ -233,8 +241,8 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 
 	t.Run("should delete employee successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
-
+		validator := validator.New()
+		svc := NewService(repo, validator)
 		repo.On("DeleteById", int64(1)).Return(nil)
 
 		// Вызываем тестируемый метод
@@ -247,7 +255,8 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 
 	t.Run("should return error for invalid id", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Вызываем с невалидным ID
 		err := svc.DeleteById(0)
@@ -324,7 +333,8 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 			},
 		}
 
-		svc := NewService(stub)
+		validator := validator.New()
+		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
 		got, err := svc.FindById(42)
@@ -342,8 +352,8 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 				return Entity{}, errors.New("stub database error")
 			},
 		}
-
-		svc := NewService(stub)
+		validator := validator.New()
+		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
 		response, err := svc.FindById(1)
@@ -361,7 +371,8 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 
 	t.Run("should return employees by ids", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		// Тестовые данные
 		entities := []Entity{
@@ -385,7 +396,8 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
@@ -407,7 +419,8 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 
 	t.Run("should delete employees by ids successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		ids := []int64{1, 2}
 		repo.On("DeleteByIds", ids).Return(nil)
@@ -422,7 +435,8 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		svc := NewService(repo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
