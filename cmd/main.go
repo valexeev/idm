@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"idm/inner/common"
 	"idm/inner/common/validator"
 	"idm/inner/database"
@@ -14,39 +13,47 @@ import (
 	"syscall"
 
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 func main() {
 	// 1. Читаем конфигурацию из .env файла или переменных окружения
 	var cfg = common.GetConfig(".env")
 
-	// 2. Создаём подключение к базе данных
+	// 2. Создаём логгер
+	var logger = common.NewLogger(cfg)
+	// Отложенный вызов записи сообщений из буфера в лог. Необходимо вызывать перед выходом из приложения
+	defer func() { _ = logger.Sync() }()
+
+	// 3. Создаём подключение к базе данных
 	var db = database.ConnectDbWithCfg(cfg)
 
-	// 3. Собираем все компоненты приложения (ручная сборка зависимостей)
-	var server = build(db, cfg)
+	// 4. Собираем все компоненты приложения (ручная сборка зависимостей)
+	var server = build(db, cfg, logger)
 
-	// 4. Запускаем веб-сервер в отдельной горутине
+	// 5. Запускаем веб-сервер в отдельной горутине
 	go func() {
 		var err = server.App.Listen(":8080")
 		if err != nil {
-			fmt.Printf("http server error: %s\n", err)
+			// паникуем через метод логгера
+			logger.Panic("http server error", zap.Error(err))
 		}
 	}()
 
-	// 5. Создаем канал для ожидания сигнала завершения работы сервера
+	// 6. Создаем канал для ожидания сигнала завершения работы сервера
 	var shutdownComplete = make(chan struct{})
 
-	// 6. Запускаем gracefulShutdown в отдельной горутине
-	go gracefulShutdown(server, db, shutdownComplete)
+	// 7. Запускаем gracefulShutdown в отдельной горутине
+	go gracefulShutdown(server, db, logger, shutdownComplete)
 
-	// 7. Ожидаем сигнал от горутины gracefulShutdown, что сервер завершил работу
+	// 8. Ожидаем сигнал от горутины gracefulShutdown, что сервер завершил работу
 	<-shutdownComplete
-	fmt.Println("Graceful shutdown complete.")
+	// все события логируем через общий логгер
+	logger.Info("graceful shutdown complete")
 }
 
 // gracefulShutdown - функция "элегантного" завершения работы сервера по сигналу от операционной системы
-func gracefulShutdown(server *web.Server, db *sqlx.DB, shutdownComplete chan struct{}) {
+func gracefulShutdown(server *web.Server, db *sqlx.DB, logger *common.Logger, shutdownComplete chan struct{}) {
 	// Уведомить основную горутину о завершении работы
 	defer close(shutdownComplete)
 
@@ -56,24 +63,27 @@ func gracefulShutdown(server *web.Server, db *sqlx.DB, shutdownComplete chan str
 
 	// Слушаем сигнал прерывания от операционной системы
 	<-ctx.Done()
-	fmt.Println("shutting down gracefully, press Ctrl+C again to force")
+	// заменили отладочную печать на логирование
+	logger.Info("shutting down gracefully, press Ctrl+C again to force")
 
 	// Завершаем работу веб-сервера
 	if err := server.App.Shutdown(); err != nil {
-		fmt.Printf("Server forced to shutdown with error: %v\n", err)
+		// Запись ошибки в лог
+		logger.Error("Server forced to shutdown with error", zap.Error(err))
 	}
 
 	// Закрываем соединение с базой данных
 	if err := db.Close(); err != nil {
-		fmt.Printf("error closing db: %v\n", err)
+		logger.Error("error closing db", zap.Error(err))
 	}
 
-	fmt.Println("Server exiting")
+	logger.Info("Server exiting")
 }
 
 // build - главная функция сборки приложения (ручная инъекция зависимостей)
 // Здесь мы создаём все компоненты и связываем их друг с другом как матрёшки
-func build(db *sqlx.DB, cfg common.Config) *web.Server {
+// передаём сюда логгер и конфиг
+func build(db *sqlx.DB, cfg common.Config, logger *common.Logger) *web.Server {
 	//  1. СОЗДАЁМ ВЕБ-СЕРВЕР (самая большая "матрёшка")
 	var server = web.NewServer()
 
@@ -88,8 +98,8 @@ func build(db *sqlx.DB, cfg common.Config) *web.Server {
 	// 3.2 Создаём сервис, передавая в него репозиторий и валидатор
 	var employeeService = employee.NewService(employeeRepo, vld)
 
-	// 3.3 Создаём контроллер, передавая в него сервер и сервис
-	var employeeController = employee.NewController(server, employeeService)
+	// 3.3 Создаём контроллер, передавая в него сервер, сервис и логгер
+	var employeeController = employee.NewController(server, employeeService, logger)
 
 	// 3.4 Регистрируем маршруты контроллера
 	employeeController.RegisterRoutes()
@@ -102,6 +112,7 @@ func build(db *sqlx.DB, cfg common.Config) *web.Server {
 	var roleService = role.NewService(roleRepo)
 
 	// 4.3 Создаём контроллер, передавая в него сервер и сервис
+	// Если в roleController тоже нужен логгер, то добавьте его в NewController
 	var roleController = role.NewController(server, roleService)
 
 	// 4.4 Регистрируем маршруты контроллера
@@ -109,6 +120,7 @@ func build(db *sqlx.DB, cfg common.Config) *web.Server {
 
 	// 5. СБОРКА МОДУЛЯ INFO (информация о приложении)
 	// 5.1 Создаём контроллер, передавая сервер, конфиг и БД напрямую
+	// Если в infoController тоже нужен логгер, то добавьте его в NewController
 	var infoController = info.NewController(server, cfg, db)
 
 	// 5.2 Регистрируем маршруты контроллера

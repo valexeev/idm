@@ -8,12 +8,14 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/zap"
 )
 
 // Controller структура контроллера для работы с сотрудниками
 type Controller struct {
 	server          *web.Server // экземпляр веб-сервера
 	employeeService Svc         // сервис для работы с сотрудниками
+	logger          *common.Logger
 }
 
 // Svc интерфейс сервиса для работы с сотрудниками
@@ -28,8 +30,8 @@ type Svc interface {
 }
 
 // NewController создает новый экземпляр контроллера сотрудников
-func NewController(server *web.Server, employeeService Svc) *Controller {
-	return &Controller{server: server, employeeService: employeeService}
+func NewController(server *web.Server, employeeService Svc, logger *common.Logger) *Controller {
+	return &Controller{server: server, employeeService: employeeService, logger: logger}
 }
 
 // RegisterRoutes регистрирует все маршруты для работы с сотрудниками
@@ -77,48 +79,64 @@ func handleError(ctx *fiber.Ctx, err error) error {
 // CreateEmployeeTransactional создает нового сотрудника в рамках транзакции
 // POST /api/v1/employees/transactional
 func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
-	// Парсинг JSON тела запроса в структуру AddEmployeeRequest
 	var req AddEmployeeRequest
+
+	// Парсинг JSON
 	if err := ctx.BodyParser(&req); err != nil {
+		c.logger.Error("create employee transactional: invalid JSON", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// Валидация имени сотрудника
+	// Логируем тело запроса
+	c.logger.Debug("create employee transactional: received request", zap.Any("request", req))
+
+	// Валидация имени
 	if err := validateName(req.Name); err != nil {
+		c.logger.Error("create employee transactional: invalid name", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// Вызов сервиса для создания сотрудника в транзакции
+	// Вызов сервиса
 	resp, err := c.employeeService.AddTransactional(req)
 	if err != nil {
+		c.logger.Error("create employee transactional: failed to add employee", zap.Error(err))
 		return handleError(ctx, err)
 	}
 
-	// Возврат успешного ответа с данными созданного сотрудника
+	// Ответ
 	if err := common.OkResponse(ctx, resp); err != nil {
+		c.logger.Error("create employee transactional: failed to return response", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
 	}
+
 	return nil
 }
 
-// CreateEmployee создает нового сотрудника (простая версия без транзакции)
+// CreateEmployee создает нового сотрудника (без транзакции)
 // POST /api/v1/employees
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
-	// Парсинг JSON тела запроса в структуру AddEmployeeRequest
 	var req AddEmployeeRequest
+
+	// Парсинг JSON
 	if err := ctx.BodyParser(&req); err != nil {
+		c.logger.Error("create employee: invalid JSON", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// Валидация имени сотрудника
+	// Логируем тело запроса
+	c.logger.Debug("create employee: received request", zap.Any("request", req))
+
+	// Валидация имени
 	if err := validateName(req.Name); err != nil {
+		c.logger.Error("create employee: invalid name", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// Вызов сервиса для создания сотрудника
+	// Вызов сервиса
 	resp, err := c.employeeService.Add(req.Name)
 	if err != nil {
-		// Упрощенная обработка ошибок для простого создания
+		c.logger.Error("create employee: failed to add employee", zap.Error(err))
+
 		if errors.As(err, &common.RequestValidationError{}) {
 			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		} else {
@@ -126,10 +144,12 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 		}
 	}
 
-	// Возврат успешного ответа с данными созданного сотрудника
+	// Ответ
 	if err := common.OkResponse(ctx, resp); err != nil {
+		c.logger.Error("create employee: failed to return response", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
 	}
+
 	return nil
 }
 
