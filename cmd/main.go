@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"idm/inner/common"
 	"idm/inner/common/validator"
@@ -9,6 +10,8 @@ import (
 	"idm/inner/info"
 	"idm/inner/role"
 	"idm/inner/web"
+	"os/signal"
+	"syscall"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -20,21 +23,52 @@ func main() {
 	// 2. Создаём подключение к базе данных
 	var db = database.ConnectDbWithCfg(cfg)
 
-	// 3. Обеспечиваем корректное закрытие соединения с БД при завершении
-	defer func() {
-		if err := db.Close(); err != nil {
-			fmt.Printf("error closing db: %v", err)
+	// 3. Собираем все компоненты приложения (ручная сборка зависимостей)
+	var server = build(db, cfg)
+
+	// 4. Запускаем веб-сервер в отдельной горутине
+	go func() {
+		var err = server.App.Listen(":8080")
+		if err != nil {
+			fmt.Printf("http server error: %s\n", err)
 		}
 	}()
 
-	// 4. Собираем все компоненты приложения (ручная сборка зависимостей)
-	var server = build(db, cfg)
+	// 5. Создаем канал для ожидания сигнала завершения работы сервера
+	var shutdownComplete = make(chan struct{})
 
-	// 5. Запускаем веб-сервер на порту 8080
-	var err = server.App.Listen(":8080")
-	if err != nil {
-		panic(fmt.Sprintf("http server error: %s", err))
+	// 6. Запускаем gracefulShutdown в отдельной горутине
+	go gracefulShutdown(server, db, shutdownComplete)
+
+	// 7. Ожидаем сигнал от горутины gracefulShutdown, что сервер завершил работу
+	<-shutdownComplete
+	fmt.Println("Graceful shutdown complete.")
+}
+
+// gracefulShutdown - функция "элегантного" завершения работы сервера по сигналу от операционной системы
+func gracefulShutdown(server *web.Server, db *sqlx.DB, shutdownComplete chan struct{}) {
+	// Уведомить основную горутину о завершении работы
+	defer close(shutdownComplete)
+
+	// Создаём контекст, который слушает сигналы прерывания от операционной системы
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	defer stop()
+
+	// Слушаем сигнал прерывания от операционной системы
+	<-ctx.Done()
+	fmt.Println("shutting down gracefully, press Ctrl+C again to force")
+
+	// Завершаем работу веб-сервера
+	if err := server.App.Shutdown(); err != nil {
+		fmt.Printf("Server forced to shutdown with error: %v\n", err)
 	}
+
+	// Закрываем соединение с базой данных
+	if err := db.Close(); err != nil {
+		fmt.Printf("error closing db: %v\n", err)
+	}
+
+	fmt.Println("Server exiting")
 }
 
 // build - главная функция сборки приложения (ручная инъекция зависимостей)
