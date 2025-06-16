@@ -16,7 +16,6 @@ func NewServer() *Server {
 	app := fiber.New()
 	groupInternal := app.Group("/internal")
 
-
 	// создаём группу "/api"
 	groupApi := app.Group("/api")
 
