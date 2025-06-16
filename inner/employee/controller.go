@@ -7,257 +7,241 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 )
 
+// Controller структура контроллера для работы с сотрудниками
 type Controller struct {
-	server          *web.Server
-	employeeService Svc
+	server          *web.Server // экземпляр веб-сервера
+	employeeService Svc         // сервис для работы с сотрудниками
 }
 
-// интерфейс сервиса employee.Service
+// Svc интерфейс сервиса для работы с сотрудниками
 type Svc interface {
-	FindById(id int64) (Response, error)
-	AddTransactional(request AddEmployeeRequest) (Response, error)
-	Add(name string) (Response, error)
-	FindAll() ([]Response, error)
-	FindByIds(ids []int64) ([]Response, error)
-	DeleteById(id int64) error
-	DeleteByIds(ids []int64) error
+	FindById(id int64) (Response, error)                           // поиск сотрудника по ID
+	AddTransactional(request AddEmployeeRequest) (Response, error) // добавление сотрудника в транзакции
+	Add(name string) (Response, error)                             // простое добавление сотрудника
+	FindAll() ([]Response, error)                                  // получение всех сотрудников
+	FindByIds(ids []int64) ([]Response, error)                     // поиск сотрудников по списку ID
+	DeleteById(id int64) error                                     // удаление сотрудника по ID
+	DeleteByIds(ids []int64) error                                 // удаление сотрудников по списку ID
 }
 
+// NewController создает новый экземпляр контроллера сотрудников
 func NewController(server *web.Server, employeeService Svc) *Controller {
-	return &Controller{
-		server:          server,
-		employeeService: employeeService,
-	}
+	return &Controller{server: server, employeeService: employeeService}
 }
 
-// функция для регистрации маршрутов
+// RegisterRoutes регистрирует все маршруты для работы с сотрудниками
 func (c *Controller) RegisterRoutes() {
-	// CRUD операции для employees
-	c.server.GroupApiV1.Post("/employees", c.CreateEmployee)
-	c.server.GroupApiV1.Post("/employees/transactional", c.CreateEmployeeTransactional)
-	c.server.GroupApiV1.Get("/employees/:id", c.GetEmployee)
-	c.server.GroupApiV1.Get("/employees", c.GetAllEmployees)
-	c.server.GroupApiV1.Post("/employees/by-ids", c.GetEmployeesByIds)
-	c.server.GroupApiV1.Delete("/employees/:id", c.DeleteEmployee)
-	c.server.GroupApiV1.Delete("/employees", c.DeleteEmployeesByIds)
+	api := c.server.GroupApiV1 // группа маршрутов API v1
+
+	// CRUD операции для сотрудников
+	api.Post("/employees", c.CreateEmployee)                            // создание сотрудника
+	api.Post("/employees/transactional", c.CreateEmployeeTransactional) // создание сотрудника в транзакции
+	api.Get("/employees/:id", c.GetEmployee)                            // получение сотрудника по ID
+	api.Get("/employees", c.GetAllEmployees)                            // получение всех сотрудников
+	api.Post("/employees/by-ids", c.GetEmployeesByIds)                  // получение сотрудников по списку ID
+	api.Delete("/employees/:id", c.DeleteEmployee)                      // удаление сотрудника по ID
+	api.Delete("/employees", c.DeleteEmployeesByIds)                    // удаление сотрудников по списку ID
 }
 
-// validateEmployeeName валидирует имя сотрудника
-func validateEmployeeName(name string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
+// validateName проверяет корректность имени сотрудника
+func validateName(name string) error {
+	if strings.TrimSpace(name) == "" {
 		return errors.New("employee name cannot be empty")
 	}
 	return nil
 }
 
-// функция-хендлер для создания сотрудника (транзакционно)
-func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) {
-	// анмаршалим JSON body запроса в структуру AddEmployeeRequest
-	var request AddEmployeeRequest
-	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+// handleError централизованная обработка ошибок с соответствующими HTTP статусами
+func handleError(ctx *fiber.Ctx, err error) error {
+	switch {
+	// Ошибки валидации и дублирования - 400 Bad Request
+	case errors.As(err, &common.RequestValidationError{}),
+		errors.As(err, &common.AlreadyExistsError{}):
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	// Ошибки транзакций и репозитория - 500 Internal Server Error
+	case errors.As(err, &common.TransactionError{}),
+		errors.As(err, &common.RepositoryError{}):
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	// Ошибки отсутствия данных - 404 Not Found
+	case errors.As(err, &common.NotFoundError{}):
+		return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+	// Все остальные ошибки - 500 Internal Server Error
+	default:
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	}
+}
+
+// CreateEmployeeTransactional создает нового сотрудника в рамках транзакции
+// POST /api/v1/employees/transactional
+func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
+	// Парсинг JSON тела запроса в структуру AddEmployeeRequest
+	var req AddEmployeeRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// валидация имени
-	if err := validateEmployeeName(request.Name); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+	// Валидация имени сотрудника
+	if err := validateName(req.Name); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// вызываем метод AddTransactional сервиса employee.Service
-	response, err := c.employeeService.AddTransactional(request)
+	// Вызов сервиса для создания сотрудника в транзакции
+	resp, err := c.employeeService.AddTransactional(req)
 	if err != nil {
-		switch {
-		// если сервис возвращает ошибку RequestValidationError или AlreadyExistsError,
-		// то мы возвращаем ответ с кодом 400 (BadRequest)
-		case errors.As(err, &common.RequestValidationError{}) || errors.As(err, &common.AlreadyExistsError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		// если сервис возвращает ошибку TransactionError,
-		// то мы возвращаем ответ с кодом 500 (InternalServerError)
-		case errors.As(err, &common.TransactionError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		// если сервис возвращает другую ошибку, то мы возвращаем ответ с кодом 500 (InternalServerError)
-		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+		return handleError(ctx, err)
+	}
+
+	// Возврат успешного ответа с данными созданного сотрудника
+	if err := common.OkResponse(ctx, resp); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
+	}
+	return nil
+}
+
+// CreateEmployee создает нового сотрудника (простая версия без транзакции)
+// POST /api/v1/employees
+func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
+	// Парсинг JSON тела запроса в структуру AddEmployeeRequest
+	var req AddEmployeeRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
+
+	// Валидация имени сотрудника
+	if err := validateName(req.Name); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
+
+	// Вызов сервиса для создания сотрудника
+	resp, err := c.employeeService.Add(req.Name)
+	if err != nil {
+		// Упрощенная обработка ошибок для простого создания
+		if errors.As(err, &common.RequestValidationError{}) {
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		} else {
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
-		return
 	}
 
-	// функция OkResponse() формирует и направляет ответ в случае успеха
-	if err = common.OkResponse(ctx, response); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
-		return
+	// Возврат успешного ответа с данными созданного сотрудника
+	if err := common.OkResponse(ctx, resp); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
 	}
+	return nil
 }
 
-// функция-хендлер для создания сотрудника (простая версия)
-func (c *Controller) CreateEmployee(ctx *fiber.Ctx) {
-	// анмаршалим JSON body запроса в структуру AddEmployeeRequest
-	var request AddEmployeeRequest
-	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
-	}
-
-	// валидация имени
-	if err := validateEmployeeName(request.Name); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
-	}
-
-	// вызываем метод Add сервиса employee.Service
-	response, err := c.employeeService.Add(request.Name)
+// GetEmployee получает сотрудника по его ID
+// GET /api/v1/employees/:id
+func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
+	// Извлечение и парсинг ID из параметров маршрута
+	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		switch {
-		// если сервис возвращает ошибку RequestValidationError,
-		// то мы возвращаем ответ с кодом 400 (BadRequest)
-		case errors.As(err, &common.RequestValidationError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		// если сервис возвращает другую ошибку, то мы возвращаем ответ с кодом 500 (InternalServerError)
-		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid employee id")
+	}
+
+	// Поиск сотрудника по ID через сервис
+	resp, err := c.employeeService.FindById(id)
+	if err != nil {
+		return handleError(ctx, err)
+	}
+
+	// Возврат данных найденного сотрудника
+	if err := common.OkResponse(ctx, resp); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employee")
+	}
+	return nil
+}
+
+// GetAllEmployees получает список всех сотрудников
+// GET /api/v1/employees
+func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
+	// Получение всех сотрудников через сервис
+	resp, err := c.employeeService.FindAll()
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	}
+
+	// Возврат списка всех сотрудников
+	if err := common.OkResponse(ctx, resp); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employees")
+	}
+	return nil
+}
+
+// GetEmployeesByIds получает сотрудников по списку ID
+// POST /api/v1/employees/by-ids
+func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
+	// Парсинг JSON тела запроса в структуру FindByIdsRequest
+	var req FindByIdsRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
+
+	// Валидация: список ID не должен быть пустым
+	if len(req.Ids) == 0 {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
+	}
+
+	// Поиск сотрудников по списку ID через сервис
+	resp, err := c.employeeService.FindByIds(req.Ids)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	}
+
+	// Возврат найденных сотрудников
+	if err := common.OkResponse(ctx, resp); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employees")
+	}
+	return nil
+}
+
+// DeleteEmployee удаляет сотрудника по его ID
+// DELETE /api/v1/employees/:id
+func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
+	// Извлечение и парсинг ID из параметров маршрута
+	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid employee id")
+	}
+
+	// Удаление сотрудника по ID через сервис
+	if err = c.employeeService.DeleteById(id); err != nil {
+		// Специальная обработка для случая "сотрудник не найден"
+		if errors.As(err, &common.NotFoundError{}) {
+			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+		} else {
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
-		return
 	}
 
-	// функция OkResponse() формирует и направляет ответ в случае успеха
-	if err = common.OkResponse(ctx, response); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
-		return
-	}
-}
-
-// функция-хендлер для получения сотрудника по ID
-func (c *Controller) GetEmployee(ctx *fiber.Ctx) {
-	// получаем ID из параметра маршрута
-	idParam := ctx.Params("id")
-	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid employee id")
-		return
-	}
-
-	// вызываем метод FindById сервиса employee.Service
-	response, err := c.employeeService.FindById(id)
-	if err != nil {
-		switch {
-		case errors.As(err, &common.RequestValidationError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		case errors.As(err, &common.RepositoryError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		case errors.As(err, &common.NotFoundError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
-		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-
-	// возвращаем успешный ответ
-	if err = common.OkResponse(ctx, response); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employee")
-		return
-	}
-}
-
-// функция-хендлер для получения всех сотрудников
-func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) {
-	// вызываем метод FindAll сервиса employee.Service
-	responses, err := c.employeeService.FindAll()
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// возвращаем успешный ответ
-	if err = common.OkResponse(ctx, responses); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employees")
-		return
-	}
-}
-
-// функция-хендлер для получения сотрудников по списку ID
-func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) {
-	// анмаршалим JSON body запроса в структуру FindByIdsRequest
-	var request FindByIdsRequest
-	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
-	}
-
-	// валидация запроса
-	if len(request.Ids) == 0 {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
-		return
-	}
-
-	// вызываем метод FindByIds сервиса employee.Service
-	responses, err := c.employeeService.FindByIds(request.Ids)
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// возвращаем успешный ответ
-	if err = common.OkResponse(ctx, responses); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning employees")
-		return
-	}
-}
-
-// функция-хендлер для удаления сотрудника по ID
-func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) {
-	// получаем ID из параметра маршрута
-	idParam := ctx.Params("id")
-	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid employee id")
-		return
-	}
-
-	// вызываем метод DeleteById сервиса employee.Service
-	err = c.employeeService.DeleteById(id)
-	if err != nil {
-		switch {
-		case errors.As(err, &common.NotFoundError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
-		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-
-	// возвращаем успешный ответ (статус 204 No Content)
+	// Возврат статуса 204 No Content при успешном удалении
 	ctx.Status(fiber.StatusNoContent)
+	return nil
 }
 
-// функция-хендлер для удаления сотрудников по списку ID
-func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) {
-	// анмаршалим JSON body запроса в структуру DeleteByIdsRequest
-	var request DeleteByIdsRequest
-	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+// DeleteEmployeesByIds удаляет сотрудников по списку ID
+// DELETE /api/v1/employees
+func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
+	// Парсинг JSON тела запроса в структуру DeleteByIdsRequest
+	var req DeleteByIdsRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	// валидация запроса
-	if len(request.Ids) == 0 {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
-		return
+	// Валидация: список ID не должен быть пустым
+	if len(req.Ids) == 0 {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
 	}
 
-	// вызываем метод DeleteByIds сервиса employee.Service
-	err := c.employeeService.DeleteByIds(request.Ids)
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
+	// Удаление сотрудников по списку ID через сервис
+	if err := c.employeeService.DeleteByIds(req.Ids); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
-	// возвращаем успешный ответ (статус 204 No Content)
+	// Возврат статуса 204 No Content при успешном удалении
 	ctx.Status(fiber.StatusNoContent)
+	return nil
 }

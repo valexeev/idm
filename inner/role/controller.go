@@ -6,7 +6,7 @@ import (
 	"idm/inner/web"
 	"strconv"
 
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Controller struct {
@@ -43,12 +43,11 @@ func (c *Controller) RegisterRoutes() {
 }
 
 // функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/roles"
-func (c *Controller) CreateRole(ctx *fiber.Ctx) {
+func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру AddRoleRequest
 	var request AddRoleRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// вызываем метод Add сервиса role.Service
@@ -58,30 +57,28 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) {
 		// если сервис возвращает ошибку RequestValidationError или AlreadyExistsError,
 		// то мы возвращаем ответ с кодом 400 (BadRequest)
 		case errors.As(err, &common.RequestValidationError{}) || errors.As(err, &common.AlreadyExistsError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		// если сервис возвращает другую ошибку, то мы возвращаем ответ с кодом 500 (InternalServerError)
 		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
-		return
 	}
 
 	// функция OkResponse() формирует и направляет ответ в случае успеха
 	if err = common.OkResponse(ctx, response); err != nil {
 		// функция ErrorResponse() формирует и направляет ответ в случае ошибки
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created role")
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created role")
 	}
+	return nil
 }
 
 // функция-хендлер для получения роли по ID
-func (c *Controller) GetRole(ctx *fiber.Ctx) {
+func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
 	// вызываем метод FindById сервиса role.Service
@@ -89,99 +86,91 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) {
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
 		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
-		return
 	}
 
 	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, response); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning role")
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning role")
 	}
+	return nil
 }
 
 // функция-хендлер для получения всех ролей
-func (c *Controller) GetAllRoles(ctx *fiber.Ctx) {
+func (c *Controller) GetAllRoles(ctx *fiber.Ctx) error {
 	// вызываем метод FindAll сервиса role.Service
 	responses, err := c.roleService.FindAll()
 	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
 	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, responses); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
 	}
+	return nil
 }
 
 // функция-хендлер для получения ролей по списку ID
-func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) {
+func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру FindByIdsRequest
 	var request FindByIdsRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
 	}
 
 	// вызываем метод FindByIds сервиса role.Service
 	responses, err := c.roleService.FindByIds(request.Ids)
 	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
 	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, responses); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
 	}
+	return nil
 }
 
 // функция-хендлер для удаления ролей по списку ID
-func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) {
+func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру DeleteByIdsRequest
 	var request DeleteByIdsRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
 	}
 
 	// вызываем метод DeleteByIds сервиса role.Service
 	err := c.roleService.DeleteByIds(request.Ids)
 	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
 	// возвращаем успешный ответ (статус 204 No Content)
 	ctx.Status(fiber.StatusNoContent)
+	return nil
 }
 
 // функция-хендлер для удаления роли по ID
-func (c *Controller) DeleteRole(ctx *fiber.Ctx) {
+func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
-		return
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
 	// вызываем метод DeleteById сервиса role.Service
@@ -189,13 +178,13 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) {
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
-			_ = common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
 		default:
-			_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
-		return
 	}
 
 	// возвращаем успешный ответ (статус 204 No Content)
 	ctx.Status(fiber.StatusNoContent)
+	return nil
 }
