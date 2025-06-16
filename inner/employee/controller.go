@@ -5,7 +5,8 @@ import (
 	"idm/inner/common"
 	"idm/inner/web"
 	"strconv"
-  "strings"
+
+	"strings"
 	"github.com/gofiber/fiber"
 )
 
