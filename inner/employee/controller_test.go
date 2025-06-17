@@ -9,9 +9,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
 )
 
 // MockEmployeeService - полный мок для интерфейса Svc
@@ -70,7 +71,13 @@ func setupTest(t *testing.T) (*fiber.App, *MockEmployeeService) {
 	}
 
 	mockService := new(MockEmployeeService)
-	controller := NewController(server, mockService)
+
+	// Создаем тестовый логгер
+	logger := zap.NewNop() // Логгер, который ничего не делает (подходит для тестов)
+	commonLogger := &common.Logger{Logger: logger}
+
+	// Добавляем логгер
+	controller := NewController(server, mockService, commonLogger)
 
 	// Явная проверка инициализации контроллера
 	if controller == nil {

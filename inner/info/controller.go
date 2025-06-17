@@ -6,7 +6,7 @@ import (
 	"idm/inner/web"
 	"time"
 
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 )
 
 // Database интерфейс для работы с базой данных
@@ -47,19 +47,18 @@ func (c *Controller) RegisterRoutes() {
 }
 
 // GetInfo получение информации о приложении
-func (c *Controller) GetInfo(ctx *fiber.Ctx) {
-	var err = ctx.Status(fiber.StatusOK).JSON(&InfoResponse{
+func (c *Controller) GetInfo(ctx *fiber.Ctx) error {
+	if err := ctx.Status(fiber.StatusOK).JSON(&InfoResponse{
 		Name:    c.cfg.AppName,
 		Version: c.cfg.AppVersion,
-	})
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning info")
-		return
+	}); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning info")
 	}
+	return nil
 }
 
 // GetHealth проверка работоспособности приложения
-func (c *Controller) GetHealth(ctx *fiber.Ctx) {
+func (c *Controller) GetHealth(ctx *fiber.Ctx) error {
 	// Создаем контекст с таймаутом для проверки БД
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -67,17 +66,17 @@ func (c *Controller) GetHealth(ctx *fiber.Ctx) {
 	// Проверяем подключение к базе данных
 	if err := c.db.PingContext(dbCtx); err != nil {
 		// База данных недоступна - возвращаем 500 для перезапуска
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "Database connection failed")
-		return
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "Database connection failed")
 	}
 
 	// Все проверки прошли успешно
-	ctx.Status(fiber.StatusOK).SendString("OK")
+	return ctx.Status(fiber.StatusOK).SendString("OK")
+
 }
 
 // GetHealthDetailed возвращает детальную информацию о состоянии системы
 // Можно использовать для более подробной диагностики
-func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) {
+func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) error {
 	// Создаем контекст с таймаутом для проверки БД
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -95,12 +94,11 @@ func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) {
 		statusCode = fiber.StatusOK
 	}
 
-	var err = ctx.Status(statusCode).JSON(&HealthResponse{
+	if err := ctx.Status(statusCode).JSON(&HealthResponse{
 		Status:   healthStatus,
 		Database: dbStatus,
-	})
-	if err != nil {
-		_ = common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning health status")
-		return
+	}); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning health status")
 	}
+	return nil
 }

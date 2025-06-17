@@ -1,17 +1,29 @@
 package main
 
 import (
-	"fmt"
+	"idm/inner/common"
 	"idm/inner/database"
-	"log"
+
+	"go.uber.org/zap"
 )
 
 func main() {
-	fmt.Println("Hello, Go.")
+	// Читаем конфиг
+	cfg := common.GetConfig(".env")
+
+	// Создаём логгер
+	logger := common.NewLogger(cfg)
+	defer func() { _ = logger.Sync() }()
+
+	logger.Info("Hello, Go.")
 
 	// Подключаемся к БД
-	db := database.ConnectDb()
-	defer db.Close()
+	db := database.ConnectDbWithCfg(cfg)
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Error("error closing db", zap.Error(err))
+		}
+	}()
 
-	log.Println("DB connected")
+	logger.Info("DB connected")
 }
