@@ -50,7 +50,11 @@ func (v Validator) customValidationError(errs validator.ValidationErrors) error 
 	for _, err := range errs {
 		switch err.Tag() {
 		case "required":
-			messages = append(messages, fmt.Sprintf("%s cannot be empty", strings.ToLower(err.Field())))
+			if strings.ToLower(err.Field()) == "ids" {
+				messages = append(messages, "ids list cannot be empty")
+			} else {
+				messages = append(messages, fmt.Sprintf("%s cannot be empty", strings.ToLower(err.Field())))
+			}
 		case "min":
 			messages = append(messages, fmt.Sprintf("%s must be at least %s characters long", strings.ToLower(err.Field()), err.Param()))
 		case "max":

@@ -30,3 +30,7 @@ type DeleteByIdRequest struct {
 type DeleteByIdsRequest struct {
 	Ids []int64 `json:"ids" validate:"required,min=1,dive,gt=0"`
 }
+
+type UpdateRoleRequest struct {
+	Name string `json:"name" validate:"required,min=2,max=50"`
+}

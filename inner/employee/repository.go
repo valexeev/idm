@@ -1,9 +1,41 @@
 package employee
 
 import (
+	"database/sql"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
+
+// TxWrapper wraps sqlx.Tx to implement Transaction interface
+type TxWrapper struct {
+	tx *sqlx.Tx
+}
+
+func (w *TxWrapper) Rollback() error {
+	return w.tx.Rollback()
+}
+
+func (w *TxWrapper) Commit() error {
+	return w.tx.Commit()
+}
+
+func (w *TxWrapper) Get(dest interface{}, query string, args ...interface{}) error {
+	return w.tx.Get(dest, query, args...)
+}
+
+func (w *TxWrapper) QueryRow(query string, args ...interface{}) Row {
+	return &RowWrapper{row: w.tx.QueryRow(query, args...)}
+}
+
+// RowWrapper wraps sql.Row to implement Row interface
+type RowWrapper struct {
+	row *sql.Row
+}
+
+func (w *RowWrapper) Scan(dest ...interface{}) error {
+	return w.row.Scan(dest...)
+}
 
 // Repository представляет репозиторий для работы с сотрудниками
 type Repository struct {
@@ -49,12 +81,16 @@ func (r *Repository) DeleteByIds(ids []int64) error {
 }
 
 // BeginTransaction начинает новую транзакцию
-func (r *Repository) BeginTransaction() (*sqlx.Tx, error) {
-	return r.db.Beginx()
+func (r *Repository) BeginTransaction() (Transaction, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	return &TxWrapper{tx: tx}, nil
 }
 
 // FindByNameTx проверяет наличие в базе данных сотрудника с заданным именем в рамках транзакции
-func (r *Repository) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+func (r *Repository) FindByNameTx(tx Transaction, name string) (bool, error) {
 	var exists bool
 	err := tx.Get(
 		&exists,
@@ -65,7 +101,7 @@ func (r *Repository) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
 }
 
 // AddTx добавляет нового сотрудника в рамках транзакции
-func (r *Repository) AddTx(tx *sqlx.Tx, e *Entity) error {
+func (r *Repository) AddTx(tx Transaction, e *Entity) error {
 	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
 	return tx.QueryRow(query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }

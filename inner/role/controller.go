@@ -22,6 +22,7 @@ type Svc interface {
 	FindByIds(ids []int64) ([]Response, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
+	ValidateRequest(request any) error
 }
 
 func NewController(server *web.Server, roleService Svc) *Controller {
@@ -47,6 +48,9 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру AddRoleRequest
 	var request AddRoleRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
+	if err := c.roleService.ValidateRequest(request); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
@@ -77,7 +81,7 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
+	if err != nil || id <= 0 {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
@@ -87,12 +91,13 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
 			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+		case errors.As(err, &common.RequestValidationError{}):
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		default:
 			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
-	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, response); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning role")
 	}
@@ -121,6 +126,9 @@ func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&request); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
+	if err := c.roleService.ValidateRequest(request); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
@@ -147,6 +155,9 @@ func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&request); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
+	if err := c.roleService.ValidateRequest(request); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
@@ -169,7 +180,7 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
+	if err != nil || id <= 0 {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
@@ -179,12 +190,12 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
 			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+		case errors.As(err, &common.RequestValidationError{}):
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		default:
 			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
-	// возвращаем успешный ответ (статус 204 No Content)
-	ctx.Status(fiber.StatusNoContent)
-	return nil
+	return ctx.SendStatus(204)
 }
