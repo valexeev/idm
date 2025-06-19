@@ -4,9 +4,20 @@ import (
 	"fmt"
 	"idm/inner/common"
 	"time"
-
-	"github.com/jmoiron/sqlx"
 )
+
+// Transaction interface for testability
+type Transaction interface {
+	Rollback() error
+	Commit() error
+	Get(dest interface{}, query string, args ...interface{}) error
+	QueryRow(query string, args ...interface{}) Row
+}
+
+// Row interface for testability
+type Row interface {
+	Scan(dest ...interface{}) error
+}
 
 // Service структура, которая инкапсулирует бизнес-логику
 type Service struct {
@@ -22,14 +33,22 @@ type Repo interface {
 	FindByIds(ids []int64) ([]Entity, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
-	BeginTransaction() (*sqlx.Tx, error)
-	FindByNameTx(tx *sqlx.Tx, name string) (bool, error)
-	AddTx(tx *sqlx.Tx, e *Entity) error
+	BeginTransaction() (Transaction, error)
+	FindByNameTx(tx Transaction, name string) (bool, error)
+	AddTx(tx Transaction, e *Entity) error
 }
 
 type Validator interface {
 	Validate(any) error
 	ValidateWithCustomMessages(any) error
+}
+
+func (svc *Service) ValidateRequest(request interface{}) error {
+	err := svc.validator.ValidateWithCustomMessages(request)
+	if err != nil {
+		return common.RequestValidationError{Message: err.Error()}
+	}
+	return nil
 }
 
 // AddTransactional транзакционно добавляет нового сотрудника
@@ -126,8 +145,10 @@ func (svc *Service) FindById(id int64) (Response, error) {
 
 // Add добавляет нового сотрудника
 func (svc *Service) Add(name string) (Response, error) {
-	if name == "" {
-		return Response{}, common.RequestValidationError{Message: "employee name cannot be empty"}
+	req := AddEmployeeRequest{Name: name}
+	err := svc.validator.ValidateWithCustomMessages(req)
+	if err != nil {
+		return Response{}, common.RequestValidationError{Message: err.Error()}
 	}
 
 	now := time.Now()
@@ -137,7 +158,7 @@ func (svc *Service) Add(name string) (Response, error) {
 		UpdatedAt: now,
 	}
 
-	err := svc.repo.Add(entity)
+	err = svc.repo.Add(entity)
 	if err != nil {
 		return Response{}, fmt.Errorf("error adding employee: %w", err)
 	}
@@ -162,6 +183,12 @@ func (svc *Service) FindAll() ([]Response, error) {
 
 // FindByIds возвращает сотрудников по списку ID
 func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
+	// Validate the input before proceeding
+	req := FindByIdsRequest{Ids: ids}
+	if err := svc.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
 	entities, err := svc.repo.FindByIds(ids)
 	if err != nil {
 		return nil, fmt.Errorf("error finding employees by ids: %w", err)
@@ -171,14 +198,13 @@ func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
 	for i, entity := range entities {
 		responses[i] = entity.toResponse()
 	}
-
 	return responses, nil
 }
 
 // DeleteById удаляет сотрудника по ID
 func (svc *Service) DeleteById(id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("invalid employee id: %d", id)
+		return common.RequestValidationError{Message: fmt.Sprintf("invalid employee id: %d", id)}
 	}
 
 	err := svc.repo.DeleteById(id)

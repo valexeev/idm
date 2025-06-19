@@ -109,7 +109,7 @@ func build(db *sqlx.DB, cfg common.Config, logger *common.Logger) *web.Server {
 	var roleRepo = role.NewRepository(db)
 
 	// 4.2 Создаём сервис, передавая в него репозиторий
-	var roleService = role.NewService(roleRepo)
+	var roleService = role.NewService(roleRepo, vld)
 
 	// 4.3 Создаём контроллер, передавая в него сервер и сервис
 	// Если в roleController тоже нужен логгер, то добавьте его в NewController

@@ -5,7 +5,6 @@ import (
 	"idm/inner/common"
 	"idm/inner/web"
 	"strconv"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -27,6 +26,7 @@ type Svc interface {
 	FindByIds(ids []int64) ([]Response, error)                     // поиск сотрудников по списку ID
 	DeleteById(id int64) error                                     // удаление сотрудника по ID
 	DeleteByIds(ids []int64) error                                 // удаление сотрудников по списку ID
+	ValidateRequest(request interface{}) error
 }
 
 // NewController создает новый экземпляр контроллера сотрудников
@@ -46,14 +46,6 @@ func (c *Controller) RegisterRoutes() {
 	api.Post("/employees/by-ids", c.GetEmployeesByIds)                  // получение сотрудников по списку ID
 	api.Delete("/employees/:id", c.DeleteEmployee)                      // удаление сотрудника по ID
 	api.Delete("/employees", c.DeleteEmployeesByIds)                    // удаление сотрудников по списку ID
-}
-
-// validateName проверяет корректность имени сотрудника
-func validateName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return errors.New("employee name cannot be empty")
-	}
-	return nil
 }
 
 // handleError централизованная обработка ошибок с соответствующими HTTP статусами
@@ -90,12 +82,6 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 	// Логируем тело запроса
 	c.logger.Debug("create employee transactional: received request", zap.Any("request", req))
 
-	// Валидация имени
-	if err := validateName(req.Name); err != nil {
-		c.logger.Error("create employee transactional: invalid name", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	}
-
 	// Вызов сервиса
 	resp, err := c.employeeService.AddTransactional(req)
 	if err != nil {
@@ -125,12 +111,6 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 
 	// Логируем тело запроса
 	c.logger.Debug("create employee: received request", zap.Any("request", req))
-
-	// Валидация имени
-	if err := validateName(req.Name); err != nil {
-		c.logger.Error("create employee: invalid name", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	}
 
 	// Вызов сервиса
 	resp, err := c.employeeService.Add(req.Name)
@@ -199,6 +179,9 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&req); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
+	if err := c.employeeService.ValidateRequest(req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
 
 	// Валидация: список ID не должен быть пустым
 	if len(req.Ids) == 0 {
@@ -248,6 +231,9 @@ func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	// Парсинг JSON тела запроса в структуру DeleteByIdsRequest
 	var req DeleteByIdsRequest
 	if err := ctx.BodyParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	}
+	if err := c.employeeService.ValidateRequest(req); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 

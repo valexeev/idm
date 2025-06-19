@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"strings"
 	"testing"
 
 	"idm/inner/employee"
@@ -700,4 +701,100 @@ func TestValidator_Role_DeleteByIdsRequest(t *testing.T) {
 		err := v.Validate(req)
 		assert.NoError(t, err)
 	})
+}
+
+// TestValidationEdgeCases - тесты граничных случаев валидации
+func TestValidationEdgeCases(t *testing.T) {
+	v := New()
+
+	t.Run("unicode_names", func(t *testing.T) {
+		unicodeNames := []string{
+			"Владимир Путин", // Кириллица
+			"Jean-François",  // Латиница с диакритиками
+			"李小明",            // Китайские иероглифы
+			"José María",     // Испанский
+		}
+
+		for _, name := range unicodeNames {
+			req := employee.AddEmployeeRequest{Name: name}
+			err := v.Validate(req)
+			assert.NoError(t, err, "Unicode name should pass validation: %s", name)
+		}
+	})
+
+	t.Run("boundary_values", func(t *testing.T) {
+		// Точно 2 символа (минимум)
+		req1 := employee.AddEmployeeRequest{Name: "AB"}
+		err1 := v.Validate(req1)
+		assert.NoError(t, err1)
+
+		// Точно 100 символов (максимум)
+		req2 := employee.AddEmployeeRequest{Name: strings.Repeat("A", 100)}
+		err2 := v.Validate(req2)
+		assert.NoError(t, err2)
+
+		// 101 символ (превышение максимума)
+		req3 := employee.AddEmployeeRequest{Name: strings.Repeat("A", 101)}
+		err3 := v.Validate(req3)
+		assert.Error(t, err3)
+	})
+
+	t.Run("large_ids_list", func(t *testing.T) {
+		// Большой список валидных ID
+		largeIdsList := make([]int64, 1000)
+		for i := range largeIdsList {
+			largeIdsList[i] = int64(i + 1)
+		}
+
+		req := employee.FindByIdsRequest{Ids: largeIdsList}
+		err := v.Validate(req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("mixed_valid_invalid_ids", func(t *testing.T) {
+		// Один невалидный ID среди валидных
+		req := employee.FindByIdsRequest{Ids: []int64{1, 2, 0, 4}}
+		err := v.Validate(req)
+		assert.Error(t, err)
+	})
+}
+
+// TestCustomValidationMessages - тесты кастомных сообщений валидации
+func TestCustomValidationMessages(t *testing.T) {
+	v := New()
+
+	testCases := []struct {
+		name            string
+		request         interface{}
+		expectedMessage string
+	}{
+		{
+			name:            "empty_name_message",
+			request:         employee.AddEmployeeRequest{Name: ""},
+			expectedMessage: "name cannot be empty",
+		},
+		{
+			name:            "short_name_message",
+			request:         employee.AddEmployeeRequest{Name: "A"},
+			expectedMessage: "name must be at least 2 characters long",
+		},
+		{
+			name:            "long_name_message",
+			request:         employee.AddEmployeeRequest{Name: strings.Repeat("A", 101)},
+			expectedMessage: "name must be at most 100 characters long",
+		},
+		{
+			name:            "invalid_id_message",
+			request:         employee.FindByIdRequest{Id: 0},
+			expectedMessage: "id must be greater than 0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := v.ValidateWithCustomMessages(tc.request)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedMessage)
+		})
+	}
 }
