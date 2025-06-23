@@ -2,6 +2,7 @@ package role
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,33 +28,33 @@ func (m *MockRoleService) ValidateRequest(request any) error {
 	return args.Error(0)
 }
 
-func (m *MockRoleService) FindById(id int64) (Response, error) {
-	args := m.Called(id)
+func (m *MockRoleService) FindById(ctx context.Context, id int64) (Response, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(Response), args.Error(1)
 }
 
-func (m *MockRoleService) Add(name string) (Response, error) {
-	args := m.Called(name)
+func (m *MockRoleService) Add(ctx context.Context, name string) (Response, error) {
+	args := m.Called(ctx, name)
 	return args.Get(0).(Response), args.Error(1)
 }
 
-func (m *MockRoleService) FindAll() ([]Response, error) {
-	args := m.Called()
+func (m *MockRoleService) FindAll(ctx context.Context) ([]Response, error) {
+	args := m.Called(ctx)
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (m *MockRoleService) FindByIds(ids []int64) ([]Response, error) {
-	args := m.Called(ids)
+func (m *MockRoleService) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
+	args := m.Called(ctx, ids)
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (m *MockRoleService) DeleteById(id int64) error {
-	args := m.Called(id)
+func (m *MockRoleService) DeleteById(ctx context.Context, id int64) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockRoleService) DeleteByIds(ids []int64) error {
-	args := m.Called(ids)
+func (m *MockRoleService) DeleteByIds(ctx context.Context, ids []int64) error {
+	args := m.Called(ctx, ids)
 	return args.Error(0)
 }
 
@@ -123,7 +124,7 @@ func TestCreateRole(t *testing.T) {
 		request := AddRoleRequest{Name: "Admin"}
 		expected := Response{Id: 1, Name: "Admin"}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("Add", "Admin").Return(expected, nil).Once()
+		mockService.On("Add", mock.Anything, "Admin").Return(expected, nil).Once()
 
 		req := createTestRequest(t, "POST", "/api/v1/roles", request)
 		resp, err := app.Test(req)
@@ -166,7 +167,7 @@ func TestCreateRole(t *testing.T) {
 
 		request := AddRoleRequest{Name: "Admin"}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("Add", "Admin").Return(
+		mockService.On("Add", mock.Anything, "Admin").Return(
 			Response{},
 			common.AlreadyExistsError{Message: "role already exists"},
 		).Once()
@@ -190,7 +191,7 @@ func TestCreateRole(t *testing.T) {
 
 		request := AddRoleRequest{Name: "Test Role"}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("Add", "Test Role").Return(
+		mockService.On("Add", mock.Anything, "Test Role").Return(
 			Response{},
 			errors.New("internal server error"),
 		).Once()
@@ -223,7 +224,7 @@ func TestGetRole(t *testing.T) {
 		defer mockService.AssertExpectations(t)
 
 		expected := Response{Id: 1, Name: "Admin"}
-		mockService.On("FindById", int64(1)).Return(expected, nil).Once()
+		mockService.On("FindById", mock.Anything, int64(1)).Return(expected, nil).Once()
 
 		req := httptest.NewRequest("GET", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
@@ -241,7 +242,7 @@ func TestGetRole(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("FindById", int64(999)).Return(
+		mockService.On("FindById", mock.Anything, int64(999)).Return(
 			Response{},
 			common.NotFoundError{Message: "role not found"},
 		).Once()
@@ -258,7 +259,7 @@ func TestGetRole(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("FindById", int64(1)).Return(
+		mockService.On("FindById", mock.Anything, int64(1)).Return(
 			Response{},
 			errors.New("database error"),
 		).Once()
@@ -292,7 +293,7 @@ func TestGetAllRoles(t *testing.T) {
 			{Id: 1, Name: "Admin"},
 			{Id: 2, Name: "User"},
 		}
-		mockService.On("FindAll").Return(expected, nil).Once()
+		mockService.On("FindAll", mock.Anything).Return(expected, nil).Once()
 
 		req := httptest.NewRequest("GET", "/api/v1/roles", nil)
 		resp, err := app.Test(req)
@@ -310,7 +311,7 @@ func TestGetAllRoles(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("FindAll").Return(
+		mockService.On("FindAll", mock.Anything).Return(
 			[]Response{},
 			errors.New("database error"),
 		).Once()
@@ -328,7 +329,7 @@ func TestGetAllRoles(t *testing.T) {
 		defer mockService.AssertExpectations(t)
 
 		expected := []Response{}
-		mockService.On("FindAll").Return(expected, nil).Once()
+		mockService.On("FindAll", mock.Anything).Return(expected, nil).Once()
 
 		req := httptest.NewRequest("GET", "/api/v1/roles", nil)
 		resp, err := app.Test(req)
@@ -354,7 +355,7 @@ func TestGetRolesByIds(t *testing.T) {
 			{Id: 2, Name: "User"},
 		}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("FindByIds", []int64{1, 2}).Return(expected, nil).Once()
+		mockService.On("FindByIds", mock.Anything, []int64{1, 2}).Return(expected, nil).Once()
 
 		req := createTestRequest(t, "POST", "/api/v1/roles/by-ids", request)
 		resp, err := app.Test(req)
@@ -394,7 +395,7 @@ func TestGetRolesByIds(t *testing.T) {
 
 		request := FindByIdsRequest{Ids: []int64{1, 2}}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("FindByIds", []int64{1, 2}).Return(
+		mockService.On("FindByIds", mock.Anything, []int64{1, 2}).Return(
 			[]Response{},
 			errors.New("database error"),
 		).Once()
@@ -426,7 +427,7 @@ func TestDeleteRole(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("DeleteById", int64(1)).Return(nil).Once()
+		mockService.On("DeleteById", mock.Anything, int64(1)).Return(nil).Once()
 
 		req := httptest.NewRequest("DELETE", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
@@ -440,7 +441,7 @@ func TestDeleteRole(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("DeleteById", int64(999)).Return(
+		mockService.On("DeleteById", mock.Anything, int64(999)).Return(
 			common.NotFoundError{Message: "role not found"},
 		).Once()
 
@@ -456,7 +457,7 @@ func TestDeleteRole(t *testing.T) {
 		app, mockService := setupTest(t)
 		defer mockService.AssertExpectations(t)
 
-		mockService.On("DeleteById", int64(1)).Return(
+		mockService.On("DeleteById", mock.Anything, int64(1)).Return(
 			errors.New("database error"),
 		).Once()
 
@@ -487,7 +488,7 @@ func TestDeleteRolesByIds(t *testing.T) {
 
 		request := DeleteByIdsRequest{Ids: []int64{1, 2}}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("DeleteByIds", []int64{1, 2}).Return(nil).Once()
+		mockService.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(nil).Once()
 
 		req := createTestRequest(t, "DELETE", "/api/v1/roles", request)
 		resp, err := app.Test(req)
@@ -523,7 +524,7 @@ func TestDeleteRolesByIds(t *testing.T) {
 
 		request := DeleteByIdsRequest{Ids: []int64{1, 2}}
 		mockService.On("ValidateRequest", request).Return(nil).Once()
-		mockService.On("DeleteByIds", []int64{1, 2}).Return(
+		mockService.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(
 			errors.New("database error"),
 		).Once()
 
@@ -551,8 +552,6 @@ func TestDeleteRolesByIds(t *testing.T) {
 
 // TestRoleIncorrectDataHttpResponses - тесты правильных HTTP-ответов на некорректные данные
 func TestRoleIncorrectDataHttpResponses(t *testing.T) {
-	app, mockService := setupTest(t)
-
 	errorResponseTests := []struct {
 		name           string
 		method         string
@@ -625,7 +624,7 @@ func TestRoleIncorrectDataHttpResponses(t *testing.T) {
 			url:            "/api/v1/roles/999",
 			expectedStatus: 404,
 			setupMock: func(m *MockRoleService) {
-				m.On("FindById", int64(999)).Return(
+				m.On("FindById", mock.Anything, int64(999)).Return(
 					Response{}, common.NotFoundError{Message: "role not found"})
 			},
 		},
@@ -709,7 +708,7 @@ func TestRoleIncorrectDataHttpResponses(t *testing.T) {
 			url:            "/api/v1/roles/1",
 			expectedStatus: 500,
 			setupMock: func(m *MockRoleService) {
-				m.On("FindById", int64(1)).Return(
+				m.On("FindById", mock.Anything, int64(1)).Return(
 					Response{}, common.RepositoryError{Message: "database query failed"})
 			},
 		},
@@ -722,7 +721,7 @@ func TestRoleIncorrectDataHttpResponses(t *testing.T) {
 			expectedError:  "already exists",
 			setupMock: func(m *MockRoleService) {
 				m.On("ValidateRequest", AddRoleRequest{Name: "Admin"}).Return(nil)
-				m.On("Add", "Admin").Return(
+				m.On("Add", mock.Anything, "Admin").Return(
 					Response{}, common.AlreadyExistsError{Message: "role already exists"})
 			},
 		},
@@ -730,6 +729,8 @@ func TestRoleIncorrectDataHttpResponses(t *testing.T) {
 
 	for _, test := range errorResponseTests {
 		t.Run(test.name, func(t *testing.T) {
+			app, mockService := setupTest(t)
+
 			// Сбрасываем мок для каждого теста
 			mockService.ExpectedCalls = nil
 			mockService.Calls = nil
@@ -931,8 +932,6 @@ func TestRoleValidationWithDifferentErrorTypes(t *testing.T) {
 
 // TestRoleBoundaryValues - тесты граничных значений
 func TestRoleBoundaryValues(t *testing.T) {
-	app, mockService := setupTest(t)
-
 	boundaryTests := []struct {
 		name           string
 		method         string
@@ -949,7 +948,7 @@ func TestRoleBoundaryValues(t *testing.T) {
 			expectedStatus: 200,
 			setupMock: func(m *MockRoleService) {
 				m.On("ValidateRequest", AddRoleRequest{Name: "AB"}).Return(nil)
-				m.On("Add", "AB").Return(Response{Id: 1, Name: "AB"}, nil)
+				m.On("Add", mock.Anything, "AB").Return(Response{Id: 1, Name: "AB"}, nil)
 			},
 		},
 		{
@@ -961,7 +960,7 @@ func TestRoleBoundaryValues(t *testing.T) {
 			setupMock: func(m *MockRoleService) {
 				longName := strings.Repeat("R", 100)
 				m.On("ValidateRequest", AddRoleRequest{Name: longName}).Return(nil)
-				m.On("Add", longName).Return(Response{Id: 1, Name: longName}, nil)
+				m.On("Add", mock.Anything, longName).Return(Response{Id: 1, Name: longName}, nil)
 			},
 		},
 		{
@@ -971,7 +970,7 @@ func TestRoleBoundaryValues(t *testing.T) {
 			expectedStatus: 200,
 			setupMock: func(m *MockRoleService) {
 				maxId := int64(9223372036854775807)
-				m.On("FindById", maxId).Return(Response{Id: maxId, Name: "Test"}, nil)
+				m.On("FindById", mock.Anything, maxId).Return(Response{Id: maxId, Name: "Test"}, nil)
 			},
 		},
 		{
@@ -982,13 +981,15 @@ func TestRoleBoundaryValues(t *testing.T) {
 			expectedStatus: 200,
 			setupMock: func(m *MockRoleService) {
 				m.On("ValidateRequest", FindByIdsRequest{Ids: []int64{1}}).Return(nil)
-				m.On("FindByIds", []int64{1}).Return([]Response{{Id: 1, Name: "Test"}}, nil)
+				m.On("FindByIds", mock.Anything, []int64{1}).Return([]Response{{Id: 1, Name: "Test"}}, nil)
 			},
 		},
 	}
 
 	for _, test := range boundaryTests {
 		t.Run(test.name, func(t *testing.T) {
+			app, mockService := setupTest(t)
+
 			// Сбрасываем мок
 			mockService.ExpectedCalls = nil
 			mockService.Calls = nil

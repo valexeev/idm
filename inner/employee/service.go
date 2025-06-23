@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"fmt"
 	"idm/inner/common"
 	"time"
@@ -12,6 +13,7 @@ type Transaction interface {
 	Commit() error
 	Get(dest interface{}, query string, args ...interface{}) error
 	QueryRow(query string, args ...interface{}) Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) Row
 }
 
 // Row interface for testability
@@ -27,15 +29,15 @@ type Service struct {
 
 // Repo интерфейс репозитория для сотрудников
 type Repo interface {
-	FindById(id int64) (Entity, error)
-	Add(e *Entity) error
-	FindAll() ([]Entity, error)
-	FindByIds(ids []int64) ([]Entity, error)
-	DeleteById(id int64) error
-	DeleteByIds(ids []int64) error
-	BeginTransaction() (Transaction, error)
-	FindByNameTx(tx Transaction, name string) (bool, error)
-	AddTx(tx Transaction, e *Entity) error
+	FindById(ctx context.Context, id int64) (Entity, error)
+	Add(ctx context.Context, e *Entity) error
+	FindAll(ctx context.Context) ([]Entity, error)
+	FindByIds(ctx context.Context, ids []int64) ([]Entity, error)
+	DeleteById(ctx context.Context, id int64) error
+	DeleteByIds(ctx context.Context, ids []int64) error
+	BeginTransaction(ctx context.Context) (Transaction, error)
+	FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error)
+	AddTx(ctx context.Context, tx Transaction, e *Entity) error
 }
 
 type Validator interface {
@@ -53,14 +55,14 @@ func (svc *Service) ValidateRequest(request interface{}) error {
 
 // AddTransactional транзакционно добавляет нового сотрудника
 // Проверяет наличие сотрудника с таким именем и создает нового, если его нет
-func (svc *Service) AddTransactional(request AddEmployeeRequest) (response Response, err error) {
+func (svc *Service) AddTransactional(ctx context.Context, request AddEmployeeRequest) (response Response, err error) {
 	err = svc.validator.ValidateWithCustomMessages(request)
 	if err != nil {
 		return Response{}, common.RequestValidationError{Message: err.Error()}
 	}
 
 	// Начинаем транзакцию
-	tx, err := svc.repo.BeginTransaction()
+	tx, err := svc.repo.BeginTransaction(ctx)
 	if err != nil {
 		return Response{}, common.TransactionError{Message: "error creating transaction", Err: err}
 	}
@@ -95,7 +97,7 @@ func (svc *Service) AddTransactional(request AddEmployeeRequest) (response Respo
 	}()
 
 	// Проверяем, существует ли сотрудник с таким именем
-	exists, err := svc.repo.FindByNameTx(tx, request.Name)
+	exists, err := svc.repo.FindByNameTx(ctx, tx, request.Name)
 	if err != nil {
 		return Response{}, fmt.Errorf("error checking employee existence: %w", err)
 	}
@@ -112,7 +114,7 @@ func (svc *Service) AddTransactional(request AddEmployeeRequest) (response Respo
 		UpdatedAt: now,
 	}
 
-	err = svc.repo.AddTx(tx, entity)
+	err = svc.repo.AddTx(ctx, tx, entity)
 	if err != nil {
 		// Возвращаем ошибку с нужным текстом для теста
 		return Response{}, fmt.Errorf("error adding employee: %w", err)
@@ -130,12 +132,12 @@ func NewService(repo Repo, validator Validator) *Service {
 }
 
 // FindById возвращает сотрудника по ID
-func (svc *Service) FindById(id int64) (Response, error) {
+func (svc *Service) FindById(ctx context.Context, id int64) (Response, error) {
 	if id <= 0 {
 		return Response{}, common.RequestValidationError{Message: fmt.Sprintf("invalid employee id: %d", id)}
 	}
 
-	entity, err := svc.repo.FindById(id)
+	entity, err := svc.repo.FindById(ctx, id)
 	if err != nil {
 		return Response{}, common.RepositoryError{Message: fmt.Sprintf("error finding employee with id %d", id), Err: err}
 	}
@@ -144,7 +146,7 @@ func (svc *Service) FindById(id int64) (Response, error) {
 }
 
 // Add добавляет нового сотрудника
-func (svc *Service) Add(name string) (Response, error) {
+func (svc *Service) Add(ctx context.Context, name string) (Response, error) {
 	req := AddEmployeeRequest{Name: name}
 	err := svc.validator.ValidateWithCustomMessages(req)
 	if err != nil {
@@ -158,7 +160,7 @@ func (svc *Service) Add(name string) (Response, error) {
 		UpdatedAt: now,
 	}
 
-	err = svc.repo.Add(entity)
+	err = svc.repo.Add(ctx, entity)
 	if err != nil {
 		return Response{}, fmt.Errorf("error adding employee: %w", err)
 	}
@@ -167,8 +169,8 @@ func (svc *Service) Add(name string) (Response, error) {
 }
 
 // FindAll возвращает всех сотрудников
-func (svc *Service) FindAll() ([]Response, error) {
-	entities, err := svc.repo.FindAll()
+func (svc *Service) FindAll(ctx context.Context) ([]Response, error) {
+	entities, err := svc.repo.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error finding all employees: %w", err)
 	}
@@ -182,14 +184,14 @@ func (svc *Service) FindAll() ([]Response, error) {
 }
 
 // FindByIds возвращает сотрудников по списку ID
-func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
+func (svc *Service) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
 	// Validate the input before proceeding
 	req := FindByIdsRequest{Ids: ids}
 	if err := svc.ValidateRequest(req); err != nil {
 		return nil, err
 	}
 
-	entities, err := svc.repo.FindByIds(ids)
+	entities, err := svc.repo.FindByIds(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error finding employees by ids: %w", err)
 	}
@@ -202,12 +204,12 @@ func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
 }
 
 // DeleteById удаляет сотрудника по ID
-func (svc *Service) DeleteById(id int64) error {
+func (svc *Service) DeleteById(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return common.RequestValidationError{Message: fmt.Sprintf("invalid employee id: %d", id)}
 	}
 
-	err := svc.repo.DeleteById(id)
+	err := svc.repo.DeleteById(ctx, id)
 	if err != nil {
 		return fmt.Errorf("error deleting employee with id %d: %w", id, err)
 	}
@@ -216,8 +218,8 @@ func (svc *Service) DeleteById(id int64) error {
 }
 
 // DeleteByIds удаляет сотрудников по списку ID
-func (svc *Service) DeleteByIds(ids []int64) error {
-	err := svc.repo.DeleteByIds(ids)
+func (svc *Service) DeleteByIds(ctx context.Context, ids []int64) error {
+	err := svc.repo.DeleteByIds(ctx, ids)
 	if err != nil {
 		return fmt.Errorf("error deleting employees by ids: %w", err)
 	}

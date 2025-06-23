@@ -1,6 +1,7 @@
 package idm_test
 
 import (
+	"context"
 	"fmt"
 	"idm/inner/employee"
 	"idm/inner/role"
@@ -77,7 +78,8 @@ func (f *Fixture) ClearTable(table string) error {
 func (f *Fixture) Employee(name string) (int64, error) {
 	now := time.Now()
 	e := employee.Entity{Name: name, CreatedAt: now, UpdatedAt: now}
-	if err := f.employees.Add(&e); err != nil {
+	ctx := context.Background()
+	if err := f.employees.Add(ctx, &e); err != nil {
 		return 0, err
 	}
 	return e.Id, nil
@@ -87,7 +89,7 @@ func (f *Fixture) Employee(name string) (int64, error) {
 func (f *Fixture) Role(name string) (int64, error) {
 	now := time.Now()
 	r := role.Entity{Name: name, CreatedAt: now, UpdatedAt: now}
-	if err := f.roles.Add(&r); err != nil {
+	if err := f.roles.Add(context.Background(), &r); err != nil {
 		return 0, err
 	}
 	return r.Id, nil

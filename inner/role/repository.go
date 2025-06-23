@@ -1,6 +1,8 @@
 package role
 
 import (
+	"context"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -15,33 +17,33 @@ func NewRepository(database *sqlx.DB) *Repository {
 	return &Repository{db: database}
 }
 
-func (r *Repository) Add(e *Entity) error {
+func (r *Repository) Add(ctx context.Context, e *Entity) error {
 	query := `insert into role (name, created_at, updated_at) values ($1, $2, $3) returning id`
-	return r.db.QueryRow(query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
+	return r.db.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }
 
-func (r *Repository) FindById(id int64) (res Entity, err error) {
-	err = r.db.Get(&res, "select * from role where id = $1", id)
+func (r *Repository) FindById(ctx context.Context, id int64) (res Entity, err error) {
+	err = r.db.GetContext(ctx, &res, "select * from role where id = $1", id)
 	return res, err
 }
 
-func (r *Repository) FindAll() (res []Entity, err error) {
-	err = r.db.Select(&res, "select * from role")
+func (r *Repository) FindAll(ctx context.Context) (res []Entity, err error) {
+	err = r.db.SelectContext(ctx, &res, "select * from role")
 	return res, err
 }
 
-func (r *Repository) FindByIds(ids []int64) (res []Entity, err error) {
+func (r *Repository) FindByIds(ctx context.Context, ids []int64) (res []Entity, err error) {
 	query := `select * from role where id = any($1)`
-	err = r.db.Select(&res, query, pq.Array(ids))
+	err = r.db.SelectContext(ctx, &res, query, pq.Array(ids))
 	return res, err
 }
 
-func (r *Repository) DeleteById(id int64) error {
-	_, err := r.db.Exec("delete from role where id = $1", id)
+func (r *Repository) DeleteById(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "delete from role where id = $1", id)
 	return err
 }
 
-func (r *Repository) DeleteByIds(ids []int64) error {
-	_, err := r.db.Exec("delete from role where id = any($1)", pq.Array(ids))
+func (r *Repository) DeleteByIds(ctx context.Context, ids []int64) error {
+	_, err := r.db.ExecContext(ctx, "delete from role where id = any($1)", pq.Array(ids))
 	return err
 }

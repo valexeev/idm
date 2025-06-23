@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	"context"
 	role "idm/inner/role"
 
 	mock "github.com/stretchr/testify/mock"
@@ -13,17 +14,17 @@ type Repo struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: e
-func (_m *Repo) Add(e *role.Entity) error {
-	ret := _m.Called(e)
+// Add provides a mock function with given fields: ctx, e
+func (_m *Repo) Add(ctx context.Context, e *role.Entity) error {
+	ret := _m.Called(ctx, e)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*role.Entity) error); ok {
-		r0 = rf(e)
+	if rf, ok := ret.Get(0).(func(context.Context, *role.Entity) error); ok {
+		r0 = rf(ctx, e)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -31,17 +32,17 @@ func (_m *Repo) Add(e *role.Entity) error {
 	return r0
 }
 
-// DeleteById provides a mock function with given fields: id
-func (_m *Repo) DeleteById(id int64) error {
-	ret := _m.Called(id)
+// DeleteById provides a mock function with given fields: ctx, id
+func (_m *Repo) DeleteById(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteById")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(int64) error); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -49,17 +50,17 @@ func (_m *Repo) DeleteById(id int64) error {
 	return r0
 }
 
-// DeleteByIds provides a mock function with given fields: ids
-func (_m *Repo) DeleteByIds(ids []int64) error {
-	ret := _m.Called(ids)
+// DeleteByIds provides a mock function with given fields: ctx, ids
+func (_m *Repo) DeleteByIds(ctx context.Context, ids []int64) error {
+	ret := _m.Called(ctx, ids)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteByIds")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]int64) error); ok {
-		r0 = rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) error); ok {
+		r0 = rf(ctx, ids)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -67,9 +68,9 @@ func (_m *Repo) DeleteByIds(ids []int64) error {
 	return r0
 }
 
-// FindAll provides a mock function with no fields
-func (_m *Repo) FindAll() ([]role.Entity, error) {
-	ret := _m.Called()
+// FindAll provides a mock function with given fields: ctx
+func (_m *Repo) FindAll(ctx context.Context) ([]role.Entity, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindAll")
@@ -77,19 +78,19 @@ func (_m *Repo) FindAll() ([]role.Entity, error) {
 
 	var r0 []role.Entity
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]role.Entity, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) ([]role.Entity, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() []role.Entity); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) []role.Entity); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]role.Entity)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -97,9 +98,9 @@ func (_m *Repo) FindAll() ([]role.Entity, error) {
 	return r0, r1
 }
 
-// FindById provides a mock function with given fields: id
-func (_m *Repo) FindById(id int64) (role.Entity, error) {
-	ret := _m.Called(id)
+// FindById provides a mock function with given fields: ctx, id
+func (_m *Repo) FindById(ctx context.Context, id int64) (role.Entity, error) {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindById")
@@ -107,17 +108,17 @@ func (_m *Repo) FindById(id int64) (role.Entity, error) {
 
 	var r0 role.Entity
 	var r1 error
-	if rf, ok := ret.Get(0).(func(int64) (role.Entity, error)); ok {
-		return rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (role.Entity, error)); ok {
+		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(int64) role.Entity); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) role.Entity); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Get(0).(role.Entity)
 	}
 
-	if rf, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = rf(id)
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -125,9 +126,9 @@ func (_m *Repo) FindById(id int64) (role.Entity, error) {
 	return r0, r1
 }
 
-// FindByIds provides a mock function with given fields: ids
-func (_m *Repo) FindByIds(ids []int64) ([]role.Entity, error) {
-	ret := _m.Called(ids)
+// FindByIds provides a mock function with given fields: ctx, ids
+func (_m *Repo) FindByIds(ctx context.Context, ids []int64) ([]role.Entity, error) {
+	ret := _m.Called(ctx, ids)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByIds")
@@ -135,19 +136,19 @@ func (_m *Repo) FindByIds(ids []int64) ([]role.Entity, error) {
 
 	var r0 []role.Entity
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]int64) ([]role.Entity, error)); ok {
-		return rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]role.Entity, error)); ok {
+		return rf(ctx, ids)
 	}
-	if rf, ok := ret.Get(0).(func([]int64) []role.Entity); ok {
-		r0 = rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []role.Entity); ok {
+		r0 = rf(ctx, ids)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]role.Entity)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]int64) error); ok {
-		r1 = rf(ids)
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
 	} else {
 		r1 = ret.Error(1)
 	}

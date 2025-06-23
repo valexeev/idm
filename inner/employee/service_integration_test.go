@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"errors"
 	"idm/inner/common/validator"
 	"testing"
@@ -25,7 +26,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 
 		// No mock expectations needed since we return early for empty name
 		request := AddEmployeeRequest{Name: ""}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		// Debug logging
 		t.Logf("Response: %+v", response)
@@ -67,7 +68,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectCommit()
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.NoError(err)
 		a.Equal(int64(1), response.Id)
@@ -94,7 +95,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectRollback()
 
 		request := AddEmployeeRequest{Name: "Existing Employee"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -124,7 +125,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectRollback()
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -154,7 +155,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectCommit().WillReturnError(errors.New("commit failed"))
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -178,7 +179,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectBegin().WillReturnError(errors.New("failed to begin transaction"))
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -205,7 +206,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectRollback()
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -235,7 +236,7 @@ func TestEmployeeService_AddTransactional_WithSqlMock(t *testing.T) {
 		mock.ExpectRollback().WillReturnError(errors.New("rollback failed"))
 
 		request := AddEmployeeRequest{Name: "John Doe"}
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Equal(Response{}, response)
 		a.Error(err)
@@ -268,7 +269,7 @@ func TestEmployeeService_NonTransactionalMethods_WithSqlMock(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "created_at", "updated_at"}).
 				AddRow(1, "John Doe", createdAt, updatedAt))
 
-		response, err := svc.FindById(1)
+		response, err := svc.FindById(context.Background(), 1)
 
 		a.NoError(err)
 		a.Equal(int64(1), response.Id)
@@ -292,7 +293,7 @@ func TestEmployeeService_NonTransactionalMethods_WithSqlMock(t *testing.T) {
 			WithArgs("John Doe", sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
-		response, err := svc.Add("John Doe")
+		response, err := svc.Add(context.Background(), "John Doe")
 
 		a.NoError(err)
 		a.Equal(int64(1), response.Id)
