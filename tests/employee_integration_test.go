@@ -1,6 +1,7 @@
 package idm_test
 
 import (
+	"context"
 	"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -40,13 +41,14 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			}
 		}()
 
+		ctx := context.Background()
 		// Начинаем транзакцию
-		tx, err := employeeRepo.BeginTransaction()
+		tx, err := employeeRepo.BeginTransaction(ctx)
 		a.NoError(err)
 		a.NotNil(tx)
 
 		// Проверяем, что сотрудника с таким именем не существует
-		exists, err := employeeRepo.FindByNameTx(tx, "John Transaction")
+		exists, err := employeeRepo.FindByNameTx(ctx, tx, "John Transaction")
 		a.NoError(err)
 		a.False(exists)
 
@@ -58,7 +60,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			UpdatedAt: now,
 		}
 
-		err = employeeRepo.AddTx(tx, entity)
+		err = employeeRepo.AddTx(ctx, tx, entity)
 		a.NoError(err)
 		a.Greater(entity.Id, int64(0))
 
@@ -67,7 +69,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		a.NoError(err)
 
 		// Проверяем, что сотрудник действительно создан
-		savedEmployee, err := employeeRepo.FindById(entity.Id)
+		savedEmployee, err := employeeRepo.FindById(ctx, entity.Id)
 		a.NoError(err)
 		a.Equal("John Transaction", savedEmployee.Name)
 	})
@@ -79,8 +81,9 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			}
 		}()
 
+		ctx := context.Background()
 		// Начинаем транзакцию
-		tx, err := employeeRepo.BeginTransaction()
+		tx, err := employeeRepo.BeginTransaction(ctx)
 		a.NoError(err)
 
 		// Создаем сотрудника
@@ -91,7 +94,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			UpdatedAt: now,
 		}
 
-		err = employeeRepo.AddTx(tx, entity)
+		err = employeeRepo.AddTx(ctx, tx, entity)
 		a.NoError(err)
 
 		// Откатываем транзакцию
@@ -99,7 +102,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		a.NoError(err)
 
 		// Проверяем, что сотрудник не был сохранен
-		_, err = employeeRepo.FindById(entity.Id)
+		_, err = employeeRepo.FindById(ctx, entity.Id)
 		a.Error(err) // Должна быть ошибка, так как записи нет
 	})
 
@@ -117,11 +120,12 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
-		err = employeeRepo.Add(existingEmployee)
+		ctx := context.Background()
+		err = employeeRepo.Add(ctx, existingEmployee)
 		a.NoError(err)
 
 		// Теперь проверяем в транзакции
-		tx, err := employeeRepo.BeginTransaction()
+		tx, err := employeeRepo.BeginTransaction(ctx)
 		a.NoError(err)
 		defer func() {
 			// Обрабатываем ошибку rollback корректно
@@ -130,7 +134,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			}
 		}()
 
-		exists, err := employeeRepo.FindByNameTx(tx, "Existing Employee")
+		exists, err := employeeRepo.FindByNameTx(ctx, tx, "Existing Employee")
 		a.NoError(err)
 		a.True(exists)
 	})
@@ -142,7 +146,8 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			}
 		}()
 
-		tx, err := employeeRepo.BeginTransaction()
+		ctx := context.Background()
+		tx, err := employeeRepo.BeginTransaction(ctx)
 		a.NoError(err)
 
 		now := time.Now()
@@ -152,7 +157,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			UpdatedAt: now,
 		}
 
-		err = employeeRepo.AddTx(tx, entity)
+		err = employeeRepo.AddTx(ctx, tx, entity)
 		a.NoError(err)
 		a.Greater(entity.Id, int64(0))
 
@@ -160,7 +165,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		a.NoError(err)
 
 		// Проверяем, что сотрудник создан
-		savedEmployee, err := employeeRepo.FindById(entity.Id)
+		savedEmployee, err := employeeRepo.FindById(ctx, entity.Id)
 		a.NoError(err)
 		a.Equal("AddTx Test", savedEmployee.Name)
 	})
@@ -172,29 +177,30 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 			}
 		}()
 
-		tx, err := employeeRepo.BeginTransaction()
+		ctx := context.Background()
+		tx, err := employeeRepo.BeginTransaction(ctx)
 		a.NoError(err)
 
 		now := time.Now()
 
 		// Создаем первого сотрудника
 		employee1 := &employee.Entity{Name: "Employee 1", CreatedAt: now, UpdatedAt: now}
-		err = employeeRepo.AddTx(tx, employee1)
+		err = employeeRepo.AddTx(ctx, tx, employee1)
 		a.NoError(err)
 		a.Greater(employee1.Id, int64(0))
 
 		// Создаем второго сотрудника
 		employee2 := &employee.Entity{Name: "Employee 2", CreatedAt: now, UpdatedAt: now}
-		err = employeeRepo.AddTx(tx, employee2)
+		err = employeeRepo.AddTx(ctx, tx, employee2)
 		a.NoError(err)
 		a.Greater(employee2.Id, int64(0))
 
 		// Проверяем существование в рамках той же транзакции
-		exists1, err := employeeRepo.FindByNameTx(tx, "Employee 1")
+		exists1, err := employeeRepo.FindByNameTx(ctx, tx, "Employee 1")
 		a.NoError(err)
 		a.True(exists1)
 
-		exists2, err := employeeRepo.FindByNameTx(tx, "Employee 2")
+		exists2, err := employeeRepo.FindByNameTx(ctx, tx, "Employee 2")
 		a.NoError(err)
 		a.True(exists2)
 
@@ -202,11 +208,11 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		a.NoError(err)
 
 		// Проверяем, что оба сотрудника созданы
-		saved1, err := employeeRepo.FindById(employee1.Id)
+		saved1, err := employeeRepo.FindById(ctx, employee1.Id)
 		a.NoError(err)
 		a.Equal("Employee 1", saved1.Name)
 
-		saved2, err := employeeRepo.FindById(employee2.Id)
+		saved2, err := employeeRepo.FindById(ctx, employee2.Id)
 		a.NoError(err)
 		a.Equal("Employee 2", saved2.Name)
 	})

@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"fmt"
 	"idm/inner/common"
 	"time"
@@ -14,12 +15,12 @@ type Service struct {
 
 // Repo интерфейс репозитория для ролей
 type Repo interface {
-	FindById(id int64) (Entity, error)
-	Add(e *Entity) error
-	FindAll() ([]Entity, error)
-	FindByIds(ids []int64) ([]Entity, error)
-	DeleteById(id int64) error
-	DeleteByIds(ids []int64) error
+	FindById(ctx context.Context, id int64) (Entity, error)
+	Add(ctx context.Context, e *Entity) error
+	FindAll(ctx context.Context) ([]Entity, error)
+	FindByIds(ctx context.Context, ids []int64) ([]Entity, error)
+	DeleteById(ctx context.Context, id int64) error
+	DeleteByIds(ctx context.Context, ids []int64) error
 }
 type Validator interface {
 	Validate(any) error
@@ -43,7 +44,7 @@ func (svc *Service) ValidateRequest(request any) error {
 }
 
 // FindById возвращает роль по ID
-func (svc *Service) FindById(id int64) (Response, error) {
+func (svc *Service) FindById(ctx context.Context, id int64) (Response, error) {
 	if id <= 0 {
 		return Response{}, common.RequestValidationError{Message: "invalid role id"}
 	}
@@ -52,7 +53,7 @@ func (svc *Service) FindById(id int64) (Response, error) {
 		return Response{}, err
 	}
 
-	entity, err := svc.repo.FindById(id)
+	entity, err := svc.repo.FindById(ctx, id)
 	if err != nil {
 		return Response{}, fmt.Errorf("error finding role with id %d: %w", id, err)
 	}
@@ -61,7 +62,7 @@ func (svc *Service) FindById(id int64) (Response, error) {
 }
 
 // Add добавляет новую роль
-func (svc *Service) Add(name string) (Response, error) {
+func (svc *Service) Add(ctx context.Context, name string) (Response, error) {
 	req := AddRoleRequest{Name: name}
 	if err := svc.validator.ValidateWithCustomMessages(req); err != nil {
 		return Response{}, err
@@ -74,7 +75,7 @@ func (svc *Service) Add(name string) (Response, error) {
 		UpdatedAt: now,
 	}
 
-	if err := svc.repo.Add(entity); err != nil {
+	if err := svc.repo.Add(ctx, entity); err != nil {
 		return Response{}, fmt.Errorf("error adding role: %w", err)
 	}
 
@@ -82,8 +83,8 @@ func (svc *Service) Add(name string) (Response, error) {
 }
 
 // FindAll возвращает все роли
-func (svc *Service) FindAll() ([]Response, error) {
-	entities, err := svc.repo.FindAll()
+func (svc *Service) FindAll(ctx context.Context) ([]Response, error) {
+	entities, err := svc.repo.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error finding all roles: %w", err)
 	}
@@ -97,14 +98,14 @@ func (svc *Service) FindAll() ([]Response, error) {
 }
 
 // FindByIds возвращает роли по списку ID
-func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
+func (svc *Service) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
 
 	if err := svc.validator.ValidateWithCustomMessages(ids); err != nil {
 		return nil, err
 	}
 
 	// 2) Если всё ок — работаешь с repo
-	entities, err := svc.repo.FindByIds(ids)
+	entities, err := svc.repo.FindByIds(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error finding roles by ids: %w", err)
 	}
@@ -118,7 +119,7 @@ func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
 }
 
 // DeleteById удаляет роль по ID
-func (svc *Service) DeleteById(id int64) error {
+func (svc *Service) DeleteById(ctx context.Context, id int64) error {
 	if err := svc.validator.ValidateWithCustomMessages(id); err != nil {
 		return err
 	}
@@ -126,7 +127,7 @@ func (svc *Service) DeleteById(id int64) error {
 	if id <= 0 {
 		return common.RequestValidationError{Message: "invalid role id"}
 	}
-	err := svc.repo.DeleteById(id)
+	err := svc.repo.DeleteById(ctx, id)
 	if err != nil {
 		return fmt.Errorf("error deleting role with id %d: %w", id, err)
 	}
@@ -135,13 +136,13 @@ func (svc *Service) DeleteById(id int64) error {
 }
 
 // DeleteByIds удаляет роли по списку ID
-func (svc *Service) DeleteByIds(ids []int64) error {
+func (svc *Service) DeleteByIds(ctx context.Context, ids []int64) error {
 
 	if err := svc.validator.ValidateWithCustomMessages(ids); err != nil {
 		return err
 	}
 
-	err := svc.repo.DeleteByIds(ids)
+	err := svc.repo.DeleteByIds(ctx, ids)
 	if err != nil {
 		return fmt.Errorf("error deleting roles by ids: %w", err)
 	}

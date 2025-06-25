@@ -1,6 +1,7 @@
 package idm_test
 
 import (
+	"context"
 	"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -35,7 +36,7 @@ func TestRoleRepository(t *testing.T) {
 
 	t.Run("add role", func(t *testing.T) {
 		roleEntity := &role.Entity{Name: "Administrator"}
-		err := roleRepository.Add(roleEntity)
+		err := roleRepository.Add(context.Background(), roleEntity)
 		a.Nil(err)
 		a.Greater(roleEntity.Id, int64(0))
 		clearDatabase()
@@ -43,7 +44,7 @@ func TestRoleRepository(t *testing.T) {
 
 	t.Run("find role by id", func(t *testing.T) {
 		var newRoleId = fixture.MustRole("Manager")
-		got, err := roleRepository.FindById(newRoleId)
+		got, err := roleRepository.FindById(context.Background(), newRoleId)
 		a.Nil(err)
 		a.Equal(newRoleId, got.Id)
 		a.Equal("Manager", got.Name)
@@ -51,7 +52,7 @@ func TestRoleRepository(t *testing.T) {
 	})
 
 	t.Run("find role by id not found", func(t *testing.T) {
-		_, err := roleRepository.FindById(999999)
+		_, err := roleRepository.FindById(context.Background(), 999999)
 		a.Error(err)
 		clearDatabase()
 	})
@@ -59,7 +60,7 @@ func TestRoleRepository(t *testing.T) {
 	t.Run("find all roles", func(t *testing.T) {
 		fixture.MustRole("Role 1")
 		fixture.MustRole("Role 2")
-		got, err := roleRepository.FindAll()
+		got, err := roleRepository.FindAll(context.Background())
 		a.Nil(err)
 		a.Len(got, 2)
 		clearDatabase()
@@ -68,29 +69,29 @@ func TestRoleRepository(t *testing.T) {
 	t.Run("find roles by ids", func(t *testing.T) {
 		id1 := fixture.MustRole("Role 1")
 		id2 := fixture.MustRole("Role 2")
-		got, err := roleRepository.FindByIds([]int64{id1, id2})
+		got, err := roleRepository.FindByIds(context.Background(), []int64{id1, id2})
 		a.Nil(err)
 		a.Len(got, 2)
 		clearDatabase()
 	})
 
 	t.Run("delete role by id", func(t *testing.T) {
-		roleId := fixture.MustRole("To Delete")
-		err := roleRepository.DeleteById(roleId)
+		id := fixture.MustRole("ToDelete")
+		err := roleRepository.DeleteById(context.Background(), id)
 		a.Nil(err)
-		_, err = roleRepository.FindById(roleId)
+		_, err = roleRepository.FindById(context.Background(), id)
 		a.Error(err)
 		clearDatabase()
 	})
 
 	t.Run("delete roles by ids", func(t *testing.T) {
-		id1 := fixture.MustRole("Delete 1")
-		id2 := fixture.MustRole("Delete 2")
-		err := roleRepository.DeleteByIds([]int64{id1, id2})
+		id1 := fixture.MustRole("ToDelete1")
+		id2 := fixture.MustRole("ToDelete2")
+		err := roleRepository.DeleteByIds(context.Background(), []int64{id1, id2})
 		a.Nil(err)
-		all, err := roleRepository.FindAll()
+		got, err := roleRepository.FindAll(context.Background())
 		a.Nil(err)
-		a.Empty(all)
+		a.Len(got, 0)
 		clearDatabase()
 	})
 }

@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"errors"
 	"idm/inner/common"
 	"idm/inner/web"
@@ -19,13 +20,13 @@ type Controller struct {
 
 // Svc интерфейс сервиса для работы с сотрудниками
 type Svc interface {
-	FindById(id int64) (Response, error)                           // поиск сотрудника по ID
-	AddTransactional(request AddEmployeeRequest) (Response, error) // добавление сотрудника в транзакции
-	Add(name string) (Response, error)                             // простое добавление сотрудника
-	FindAll() ([]Response, error)                                  // получение всех сотрудников
-	FindByIds(ids []int64) ([]Response, error)                     // поиск сотрудников по списку ID
-	DeleteById(id int64) error                                     // удаление сотрудника по ID
-	DeleteByIds(ids []int64) error                                 // удаление сотрудников по списку ID
+	FindById(ctx context.Context, id int64) (Response, error)                           // поиск сотрудника по ID
+	AddTransactional(ctx context.Context, request AddEmployeeRequest) (Response, error) // добавление сотрудника в транзакции
+	Add(ctx context.Context, name string) (Response, error)                             // простое добавление сотрудника
+	FindAll(ctx context.Context) ([]Response, error)                                    // получение всех сотрудников
+	FindByIds(ctx context.Context, ids []int64) ([]Response, error)                     // поиск сотрудников по списку ID
+	DeleteById(ctx context.Context, id int64) error                                     // удаление сотрудника по ID
+	DeleteByIds(ctx context.Context, ids []int64) error                                 // удаление сотрудников по списку ID
 	ValidateRequest(request interface{}) error
 }
 
@@ -83,7 +84,7 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 	c.logger.Debug("create employee transactional: received request", zap.Any("request", req))
 
 	// Вызов сервиса
-	resp, err := c.employeeService.AddTransactional(req)
+	resp, err := c.employeeService.AddTransactional(ctx.Context(), req)
 	if err != nil {
 		c.logger.Error("create employee transactional: failed to add employee", zap.Error(err))
 		return handleError(ctx, err)
@@ -113,7 +114,7 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 	c.logger.Debug("create employee: received request", zap.Any("request", req))
 
 	// Вызов сервиса
-	resp, err := c.employeeService.Add(req.Name)
+	resp, err := c.employeeService.Add(ctx.Context(), req.Name)
 	if err != nil {
 		c.logger.Error("create employee: failed to add employee", zap.Error(err))
 
@@ -143,7 +144,7 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 	}
 
 	// Поиск сотрудника по ID через сервис
-	resp, err := c.employeeService.FindById(id)
+	resp, err := c.employeeService.FindById(ctx.Context(), id)
 	if err != nil {
 		return handleError(ctx, err)
 	}
@@ -159,7 +160,7 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 // GET /api/v1/employees
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 	// Получение всех сотрудников через сервис
-	resp, err := c.employeeService.FindAll()
+	resp, err := c.employeeService.FindAll(ctx.Context())
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
@@ -189,7 +190,7 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	}
 
 	// Поиск сотрудников по списку ID через сервис
-	resp, err := c.employeeService.FindByIds(req.Ids)
+	resp, err := c.employeeService.FindByIds(ctx.Context(), req.Ids)
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
@@ -211,7 +212,7 @@ func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
 	}
 
 	// Удаление сотрудника по ID через сервис
-	if err = c.employeeService.DeleteById(id); err != nil {
+	if err = c.employeeService.DeleteById(ctx.Context(), id); err != nil {
 		// Специальная обработка для случая "сотрудник не найден"
 		if errors.As(err, &common.NotFoundError{}) {
 			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
@@ -243,7 +244,7 @@ func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	}
 
 	// Удаление сотрудников по списку ID через сервис
-	if err := c.employeeService.DeleteByIds(req.Ids); err != nil {
+	if err := c.employeeService.DeleteByIds(ctx.Context(), req.Ids); err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 

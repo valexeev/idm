@@ -2,6 +2,7 @@ package employee
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"idm/inner/common"
 	"idm/inner/web"
@@ -21,41 +22,41 @@ type MockEmployeeService struct {
 	mock.Mock
 }
 
-func (m *MockEmployeeService) FindById(id int64) (Response, error) {
-	args := m.Called(id)
+func (m *MockEmployeeService) FindById(ctx context.Context, id int64) (Response, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(Response), args.Error(1)
 }
 
-func (m *MockEmployeeService) AddTransactional(request AddEmployeeRequest) (Response, error) {
-	args := m.Called(request)
+func (m *MockEmployeeService) AddTransactional(ctx context.Context, request AddEmployeeRequest) (Response, error) {
+	args := m.Called(ctx, request)
 	return args.Get(0).(Response), args.Error(1)
 }
 func (m *MockEmployeeService) ValidateRequest(request interface{}) error {
 	args := m.Called(request)
 	return args.Error(0)
 }
-func (m *MockEmployeeService) Add(name string) (Response, error) {
-	args := m.Called(name)
+func (m *MockEmployeeService) Add(ctx context.Context, name string) (Response, error) {
+	args := m.Called(ctx, name)
 	return args.Get(0).(Response), args.Error(1)
 }
 
-func (m *MockEmployeeService) FindAll() ([]Response, error) {
-	args := m.Called()
+func (m *MockEmployeeService) FindAll(ctx context.Context) ([]Response, error) {
+	args := m.Called(ctx)
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (m *MockEmployeeService) FindByIds(ids []int64) ([]Response, error) {
-	args := m.Called(ids)
+func (m *MockEmployeeService) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
+	args := m.Called(ctx, ids)
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (m *MockEmployeeService) DeleteById(id int64) error {
-	args := m.Called(id)
+func (m *MockEmployeeService) DeleteById(ctx context.Context, id int64) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockEmployeeService) DeleteByIds(ids []int64) error {
-	args := m.Called(ids)
+func (m *MockEmployeeService) DeleteByIds(ctx context.Context, ids []int64) error {
+	args := m.Called(ctx, ids)
 	return args.Error(0)
 }
 
@@ -128,7 +129,7 @@ func TestCreateEmployee(t *testing.T) {
 		app, mockService := setupTest(t)
 		request := AddEmployeeRequest{Name: "John Doe"}
 		expected := Response{Id: 1, Name: "John Doe"}
-		mockService.On("Add", "John Doe").Return(expected, nil)
+		mockService.On("Add", mock.Anything, "John Doe").Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees", request)
 		resp, err := app.Test(req)
@@ -147,7 +148,7 @@ func TestCreateEmployee(t *testing.T) {
 
 	t.Run("Empty Name", func(t *testing.T) {
 		app, mockService := setupTest(t)
-		mockService.On("Add", "").Return(
+		mockService.On("Add", mock.Anything, "").Return(
 			Response{},
 			common.RequestValidationError{Message: "name cannot be empty"},
 		)
@@ -184,7 +185,7 @@ func TestCreateEmployeeTransactional(t *testing.T) {
 		app, mockService := setupTest(t)
 		request := AddEmployeeRequest{Name: "John Transaction"}
 		expected := Response{Id: 2, Name: "John Transaction"}
-		mockService.On("AddTransactional", request).Return(expected, nil)
+		mockService.On("AddTransactional", mock.Anything, request).Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees/transactional", request)
 		resp, err := app.Test(req)
@@ -202,7 +203,7 @@ func TestCreateEmployeeTransactional(t *testing.T) {
 	t.Run("Transaction Error", func(t *testing.T) {
 		app, mockService := setupTest(t)
 		request := AddEmployeeRequest{Name: "Fail Transaction"}
-		mockService.On("AddTransactional", request).Return(
+		mockService.On("AddTransactional", mock.Anything, request).Return(
 			Response{},
 			common.TransactionError{Message: "transaction failed"},
 		)
@@ -221,7 +222,7 @@ func TestGetEmployee(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		app, mockService := setupTest(t)
 		expected := Response{Id: 1, Name: "Test User"}
-		mockService.On("FindById", int64(1)).Return(expected, nil)
+		mockService.On("FindById", mock.Anything, int64(1)).Return(expected, nil)
 
 		req := httptest.NewRequest("GET", "/api/v1/employees/1", nil)
 		resp, err := app.Test(req)
@@ -238,7 +239,7 @@ func TestGetEmployee(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		app, mockService := setupTest(t)
-		mockService.On("FindById", int64(999)).Return(
+		mockService.On("FindById", mock.Anything, int64(999)).Return(
 			Response{},
 			common.NotFoundError{Message: "not found"},
 		)
@@ -270,7 +271,7 @@ func TestGetAllEmployees(t *testing.T) {
 			{Id: 1, Name: "User 1"},
 			{Id: 2, Name: "User 2"},
 		}
-		mockService.On("FindAll").Return(expected, nil)
+		mockService.On("FindAll", mock.Anything).Return(expected, nil)
 
 		req := httptest.NewRequest("GET", "/api/v1/employees", nil)
 		resp, err := app.Test(req)
@@ -295,7 +296,7 @@ func TestGetEmployeesByIds(t *testing.T) {
 			{Id: 2, Name: "User 2"},
 		}
 		mockService.On("ValidateRequest", request).Return(nil)
-		mockService.On("FindByIds", []int64{1, 2}).Return(expected, nil)
+		mockService.On("FindByIds", mock.Anything, []int64{1, 2}).Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees/by-ids", request)
 		resp, err := app.Test(req)
@@ -329,7 +330,7 @@ func TestGetEmployeesByIds(t *testing.T) {
 func TestDeleteEmployee(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		app, mockService := setupTest(t)
-		mockService.On("DeleteById", int64(1)).Return(nil)
+		mockService.On("DeleteById", mock.Anything, int64(1)).Return(nil)
 
 		req := httptest.NewRequest("DELETE", "/api/v1/employees/1", nil)
 		resp, err := app.Test(req)
@@ -342,7 +343,7 @@ func TestDeleteEmployee(t *testing.T) {
 
 	t.Run("Not Found", func(t *testing.T) {
 		app, mockService := setupTest(t)
-		mockService.On("DeleteById", int64(999)).Return(
+		mockService.On("DeleteById", mock.Anything, int64(999)).Return(
 			common.NotFoundError{Message: "employee not found"},
 		)
 
@@ -371,7 +372,7 @@ func TestDeleteEmployeesByIds(t *testing.T) {
 		app, mockService := setupTest(t)
 		request := DeleteByIdsRequest{Ids: []int64{1, 2}}
 		mockService.On("ValidateRequest", request).Return(nil)
-		mockService.On("DeleteByIds", []int64{1, 2}).Return(nil)
+		mockService.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(nil)
 
 		req := createTestRequest(t, "DELETE", "/api/v1/employees", request)
 		resp, err := app.Test(req)
@@ -417,7 +418,7 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 			expectedStatus: 400,
 			expectedError:  "cannot be empty",
 			setupMock: func(m *MockEmployeeService) {
-				m.On("Add", "").Return(
+				m.On("Add", mock.Anything, "").Return(
 					Response{}, common.RequestValidationError{Message: "name cannot be empty"})
 			},
 		},
@@ -428,7 +429,7 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 			body:           AddEmployeeRequest{Name: "A"},
 			expectedStatus: 400,
 			setupMock: func(m *MockEmployeeService) {
-				m.On("AddTransactional", AddEmployeeRequest{Name: "A"}).Return(
+				m.On("AddTransactional", mock.Anything, AddEmployeeRequest{Name: "A"}).Return(
 					Response{}, common.RequestValidationError{Message: "name must be at least 2 characters long"})
 			},
 		},
@@ -446,7 +447,7 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 			url:            "/api/v1/employees/999",
 			expectedStatus: 404,
 			setupMock: func(m *MockEmployeeService) {
-				m.On("FindById", int64(999)).Return(
+				m.On("FindById", mock.Anything, int64(999)).Return(
 					Response{}, common.NotFoundError{Message: "employee not found"})
 			},
 		},
@@ -488,7 +489,7 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 			body:           AddEmployeeRequest{Name: "Valid Name"},
 			expectedStatus: 500,
 			setupMock: func(m *MockEmployeeService) {
-				m.On("AddTransactional", AddEmployeeRequest{Name: "Valid Name"}).Return(
+				m.On("AddTransactional", mock.Anything, AddEmployeeRequest{Name: "Valid Name"}).Return(
 					Response{}, common.TransactionError{Message: "database connection failed"})
 			},
 		},
@@ -498,7 +499,7 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 			url:            "/api/v1/employees/1",
 			expectedStatus: 500,
 			setupMock: func(m *MockEmployeeService) {
-				m.On("FindById", int64(1)).Return(
+				m.On("FindById", mock.Anything, int64(1)).Return(
 					Response{}, common.RepositoryError{Message: "database query failed"})
 			},
 		},

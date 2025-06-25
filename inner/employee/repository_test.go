@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
+		ctx := context.Background()
 
 		// Настраиваем mock для начала транзакции
 		mock.ExpectBegin()
@@ -38,12 +40,12 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 		mock.ExpectCommit()
 
 		// Начинаем транзакцию
-		tx, err := repo.BeginTransaction()
+		tx, err := repo.BeginTransaction(ctx)
 		a.NoError(err)
 		a.NotNil(tx)
 
 		// Проверяем существование сотрудника
-		exists, err := repo.FindByNameTx(tx, "John Doe")
+		exists, err := repo.FindByNameTx(ctx, tx, "John Doe")
 		a.NoError(err)
 		a.False(exists)
 
@@ -55,7 +57,7 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 			UpdatedAt: now,
 		}
 
-		err = repo.AddTx(tx, entity)
+		err = repo.AddTx(ctx, tx, entity)
 		a.NoError(err)
 		a.Equal(int64(1), entity.Id)
 
@@ -74,6 +76,7 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 
 		sqlxDB := sqlx.NewDb(db, "sqlmock")
 		repo := NewRepository(sqlxDB)
+		ctx := context.Background()
 
 		// Настраиваем mock для начала транзакции
 		mock.ExpectBegin()
@@ -87,11 +90,11 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 		mock.ExpectRollback()
 
 		// Начинаем транзакцию
-		tx, err := repo.BeginTransaction()
+		tx, err := repo.BeginTransaction(ctx)
 		a.NoError(err)
 
 		// Проверяем существование сотрудника
-		exists, err := repo.FindByNameTx(tx, "Existing Employee")
+		exists, err := repo.FindByNameTx(ctx, tx, "Existing Employee")
 		a.NoError(err)
 		a.True(exists)
 

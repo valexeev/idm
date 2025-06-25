@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	"context"
 	role "idm/inner/role"
 
 	mock "github.com/stretchr/testify/mock"
@@ -13,9 +14,9 @@ type Svc struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: name
-func (_m *Svc) Add(name string) (role.Response, error) {
-	ret := _m.Called(name)
+// Add provides a mock function with given fields: ctx, name
+func (_m *Svc) Add(ctx context.Context, name string) (role.Response, error) {
+	ret := _m.Called(ctx, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
@@ -23,17 +24,17 @@ func (_m *Svc) Add(name string) (role.Response, error) {
 
 	var r0 role.Response
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (role.Response, error)); ok {
-		return rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (role.Response, error)); ok {
+		return rf(ctx, name)
 	}
-	if rf, ok := ret.Get(0).(func(string) role.Response); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) role.Response); ok {
+		r0 = rf(ctx, name)
 	} else {
 		r0 = ret.Get(0).(role.Response)
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -41,17 +42,17 @@ func (_m *Svc) Add(name string) (role.Response, error) {
 	return r0, r1
 }
 
-// DeleteById provides a mock function with given fields: id
-func (_m *Svc) DeleteById(id int64) error {
-	ret := _m.Called(id)
+// DeleteById provides a mock function with given fields: ctx, id
+func (_m *Svc) DeleteById(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteById")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(int64) error); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -59,17 +60,17 @@ func (_m *Svc) DeleteById(id int64) error {
 	return r0
 }
 
-// DeleteByIds provides a mock function with given fields: ids
-func (_m *Svc) DeleteByIds(ids []int64) error {
-	ret := _m.Called(ids)
+// DeleteByIds provides a mock function with given fields: ctx, ids
+func (_m *Svc) DeleteByIds(ctx context.Context, ids []int64) error {
+	ret := _m.Called(ctx, ids)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteByIds")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]int64) error); ok {
-		r0 = rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) error); ok {
+		r0 = rf(ctx, ids)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -77,9 +78,9 @@ func (_m *Svc) DeleteByIds(ids []int64) error {
 	return r0
 }
 
-// FindAll provides a mock function with no fields
-func (_m *Svc) FindAll() ([]role.Response, error) {
-	ret := _m.Called()
+// FindAll provides a mock function with given fields: ctx
+func (_m *Svc) FindAll(ctx context.Context) ([]role.Response, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindAll")
@@ -87,19 +88,19 @@ func (_m *Svc) FindAll() ([]role.Response, error) {
 
 	var r0 []role.Response
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]role.Response, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) ([]role.Response, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() []role.Response); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) []role.Response); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]role.Response)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -107,9 +108,9 @@ func (_m *Svc) FindAll() ([]role.Response, error) {
 	return r0, r1
 }
 
-// FindById provides a mock function with given fields: id
-func (_m *Svc) FindById(id int64) (role.Response, error) {
-	ret := _m.Called(id)
+// FindById provides a mock function with given fields: ctx, id
+func (_m *Svc) FindById(ctx context.Context, id int64) (role.Response, error) {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindById")
@@ -117,17 +118,17 @@ func (_m *Svc) FindById(id int64) (role.Response, error) {
 
 	var r0 role.Response
 	var r1 error
-	if rf, ok := ret.Get(0).(func(int64) (role.Response, error)); ok {
-		return rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (role.Response, error)); ok {
+		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(int64) role.Response); ok {
-		r0 = rf(id)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) role.Response); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Get(0).(role.Response)
 	}
 
-	if rf, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = rf(id)
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -135,9 +136,9 @@ func (_m *Svc) FindById(id int64) (role.Response, error) {
 	return r0, r1
 }
 
-// FindByIds provides a mock function with given fields: ids
-func (_m *Svc) FindByIds(ids []int64) ([]role.Response, error) {
-	ret := _m.Called(ids)
+// FindByIds provides a mock function with given fields: ctx, ids
+func (_m *Svc) FindByIds(ctx context.Context, ids []int64) ([]role.Response, error) {
+	ret := _m.Called(ctx, ids)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByIds")
@@ -145,19 +146,19 @@ func (_m *Svc) FindByIds(ids []int64) ([]role.Response, error) {
 
 	var r0 []role.Response
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]int64) ([]role.Response, error)); ok {
-		return rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]role.Response, error)); ok {
+		return rf(ctx, ids)
 	}
-	if rf, ok := ret.Get(0).(func([]int64) []role.Response); ok {
-		r0 = rf(ids)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []role.Response); ok {
+		r0 = rf(ctx, ids)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]role.Response)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]int64) error); ok {
-		r1 = rf(ids)
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"errors"
 	"idm/inner/common"
 	"idm/inner/web"
@@ -16,12 +17,12 @@ type Controller struct {
 
 // интерфейс сервиса role.Service
 type Svc interface {
-	FindById(id int64) (Response, error)
-	Add(name string) (Response, error)
-	FindAll() ([]Response, error)
-	FindByIds(ids []int64) ([]Response, error)
-	DeleteById(id int64) error
-	DeleteByIds(ids []int64) error
+	FindById(ctx context.Context, id int64) (Response, error)
+	Add(ctx context.Context, name string) (Response, error)
+	FindAll(ctx context.Context) ([]Response, error)
+	FindByIds(ctx context.Context, ids []int64) ([]Response, error)
+	DeleteById(ctx context.Context, id int64) error
+	DeleteByIds(ctx context.Context, ids []int64) error
 	ValidateRequest(request any) error
 }
 
@@ -55,7 +56,7 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 	}
 
 	// вызываем метод Add сервиса role.Service
-	response, err := c.roleService.Add(request.Name)
+	response, err := c.roleService.Add(ctx.Context(), request.Name)
 	if err != nil {
 		switch {
 		// если сервис возвращает ошибку RequestValidationError или AlreadyExistsError,
@@ -86,7 +87,7 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	}
 
 	// вызываем метод FindById сервиса role.Service
-	response, err := c.roleService.FindById(id)
+	response, err := c.roleService.FindById(ctx.Context(), id)
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
@@ -107,7 +108,7 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 // функция-хендлер для получения всех ролей
 func (c *Controller) GetAllRoles(ctx *fiber.Ctx) error {
 	// вызываем метод FindAll сервиса role.Service
-	responses, err := c.roleService.FindAll()
+	responses, err := c.roleService.FindAll(ctx.Context())
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
@@ -136,7 +137,7 @@ func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 	}
 
 	// вызываем метод FindByIds сервиса role.Service
-	responses, err := c.roleService.FindByIds(request.Ids)
+	responses, err := c.roleService.FindByIds(ctx.Context(), request.Ids)
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
@@ -165,7 +166,7 @@ func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 	}
 
 	// вызываем метод DeleteByIds сервиса role.Service
-	err := c.roleService.DeleteByIds(request.Ids)
+	err := c.roleService.DeleteByIds(ctx.Context(), request.Ids)
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
@@ -185,7 +186,7 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	}
 
 	// вызываем метод DeleteById сервиса role.Service
-	err = c.roleService.DeleteById(id)
+	err = c.roleService.DeleteById(ctx.Context(), id)
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):

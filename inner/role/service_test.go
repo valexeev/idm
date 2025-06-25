@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"errors"
 	"idm/inner/common"
 	"strings"
@@ -30,33 +31,33 @@ func (m *MockValidator) ValidateWithCustomMessages(request any) error {
 	return args.Error(0)
 }
 
-func (m *MockRepo) FindById(id int64) (Entity, error) {
-	args := m.Called(id)
+func (m *MockRepo) FindById(ctx context.Context, id int64) (Entity, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(Entity), args.Error(1)
 }
 
-func (m *MockRepo) Add(e *Entity) error {
-	args := m.Called(e)
+func (m *MockRepo) Add(ctx context.Context, e *Entity) error {
+	args := m.Called(ctx, e)
 	return args.Error(0)
 }
 
-func (m *MockRepo) FindAll() ([]Entity, error) {
-	args := m.Called()
+func (m *MockRepo) FindAll(ctx context.Context) ([]Entity, error) {
+	args := m.Called(ctx)
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
-func (m *MockRepo) FindByIds(ids []int64) ([]Entity, error) {
-	args := m.Called(ids)
+func (m *MockRepo) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
+	args := m.Called(ctx, ids)
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
-func (m *MockRepo) DeleteById(id int64) error {
-	args := m.Called(id)
+func (m *MockRepo) DeleteById(ctx context.Context, id int64) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockRepo) DeleteByIds(ids []int64) error {
-	args := m.Called(ids)
+func (m *MockRepo) DeleteByIds(ctx context.Context, ids []int64) error {
+	args := m.Called(ctx, ids)
 	return args.Error(0)
 }
 
@@ -78,9 +79,9 @@ func TestRoleService_FindById(t *testing.T) {
 
 		// Правильно: валидатор вызывается с int64(1)
 		validator.On("ValidateWithCustomMessages", int64(1)).Return(nil)
-		repo.On("FindById", int64(1)).Return(entity, nil)
+		repo.On("FindById", mock.Anything, int64(1)).Return(entity, nil)
 
-		got, err := svc.FindById(1)
+		got, err := svc.FindById(context.Background(), 1)
 
 		a.Nil(err)
 		a.Equal(want, got)
@@ -97,7 +98,7 @@ func TestRoleService_FindById(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Для invalid id валидатор не вызывается, репозиторий тоже
-		response, err := svc.FindById(-1)
+		response, err := svc.FindById(context.Background(), -1)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -117,12 +118,12 @@ func TestRoleService_Add(t *testing.T) {
 
 		// Вызов с конкретным значением структуры AddRoleRequest
 		validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: "Admin"}).Return(nil)
-		repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
-			entity := args.Get(0).(*Entity)
+		repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
+			entity := args.Get(1).(*Entity)
 			entity.Id = 1
 		})
 
-		got, err := svc.Add("Admin")
+		got, err := svc.Add(context.Background(), "Admin")
 
 		a.Nil(err)
 		a.Equal(int64(1), got.Id)
@@ -141,7 +142,7 @@ func TestRoleService_Add(t *testing.T) {
 		// Ошибка валидации для пустого имени
 		validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: ""}).Return(errors.New("name cannot be empty"))
 
-		response, err := svc.Add("")
+		response, err := svc.Add(context.Background(), "")
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -165,9 +166,9 @@ func TestRoleService_FindAll(t *testing.T) {
 			{Id: 2, Name: "User", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		}
 
-		repo.On("FindAll").Return(entities, nil)
+		repo.On("FindAll", mock.Anything).Return(entities, nil)
 
-		got, err := svc.FindAll()
+		got, err := svc.FindAll(context.Background())
 
 		a.Nil(err)
 		a.Len(got, 2)
@@ -187,9 +188,9 @@ func TestRoleService_DeleteById(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		validator.On("ValidateWithCustomMessages", int64(1)).Return(nil)
-		repo.On("DeleteById", int64(1)).Return(nil)
+		repo.On("DeleteById", mock.Anything, int64(1)).Return(nil)
 
-		err := svc.DeleteById(1)
+		err := svc.DeleteById(context.Background(), 1)
 
 		a.Nil(err)
 		a.True(repo.AssertNumberOfCalls(t, "DeleteById", 1))
@@ -205,7 +206,7 @@ func TestRoleService_DeleteById(t *testing.T) {
 
 		validator.On("ValidateWithCustomMessages", int64(0)).Return(nil)
 
-		err := svc.DeleteById(0)
+		err := svc.DeleteById(context.Background(), 0)
 
 		a.NotNil(err)
 		a.Contains(err.Error(), "invalid role id")
@@ -239,10 +240,10 @@ func TestRoleService_FindByIds(t *testing.T) {
 			return s[0] == 1 && s[1] == 2
 		})).Return(nil)
 
-		repo.On("FindByIds", ids).Return(entities, nil)
+		repo.On("FindByIds", mock.Anything, ids).Return(entities, nil)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindByIds(ids)
+		got, err := svc.FindByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -269,10 +270,10 @@ func TestRoleService_FindByIds(t *testing.T) {
 			}
 			return s[0] == 1 && s[1] == 2
 		})).Return(nil)
-		repo.On("FindByIds", ids).Return([]Entity{}, repoErr)
+		repo.On("FindByIds", mock.Anything, ids).Return([]Entity{}, repoErr)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindByIds(ids)
+		got, err := svc.FindByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.Nil(got)
@@ -302,9 +303,9 @@ func TestRoleService_DeleteByIds(t *testing.T) {
 			return s[0] == 1 && s[1] == 2
 		})).Return(nil)
 
-		repo.On("DeleteByIds", ids).Return(nil)
+		repo.On("DeleteByIds", mock.Anything, ids).Return(nil)
 
-		err := svc.DeleteByIds(ids)
+		err := svc.DeleteByIds(context.Background(), ids)
 
 		a.Nil(err)
 		a.True(repo.AssertNumberOfCalls(t, "DeleteByIds", 1))
@@ -327,10 +328,10 @@ func TestRoleService_DeleteByIds(t *testing.T) {
 			}
 			return s[0] == 1 && s[1] == 2
 		})).Return(nil)
-		repo.On("DeleteByIds", ids).Return(repoErr)
+		repo.On("DeleteByIds", mock.Anything, ids).Return(repoErr)
 
 		// Вызываем тестируемый метод
-		err := svc.DeleteByIds(ids)
+		err := svc.DeleteByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.NotNil(err)
@@ -351,9 +352,9 @@ func TestRoleService_FindById_ErrorHandling(t *testing.T) {
 		entity := Entity{}
 		repoErr := errors.New("database error")
 		validator.On("ValidateWithCustomMessages", int64(1)).Return(nil)
-		repo.On("FindById", int64(1)).Return(entity, repoErr)
+		repo.On("FindById", mock.Anything, int64(1)).Return(entity, repoErr)
 
-		response, err := svc.FindById(1)
+		response, err := svc.FindById(context.Background(), 1)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -372,10 +373,10 @@ func TestRoleService_Add_ErrorHandling(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
-		repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(repoErr)
+		repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(repoErr)
 		validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: "Admin"}).Return(nil)
 
-		response, err := svc.Add("Admin")
+		response, err := svc.Add(context.Background(), "Admin")
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -393,9 +394,9 @@ func TestRoleService_FindAll_ErrorHandling(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
-		repo.On("FindAll").Return([]Entity{}, repoErr)
+		repo.On("FindAll", mock.Anything).Return([]Entity{}, repoErr)
 
-		got, err := svc.FindAll()
+		got, err := svc.FindAll(context.Background())
 
 		a.Nil(got)
 		a.NotNil(err)
@@ -413,10 +414,9 @@ func TestRoleService_DeleteById_ErrorHandling(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		validator.On("ValidateWithCustomMessages", int64(1)).Return(nil)
-		repoErr := errors.New("database error")
-		repo.On("DeleteById", int64(1)).Return(repoErr)
+		repo.On("DeleteById", mock.Anything, int64(1)).Return(errors.New("db error"))
 
-		err := svc.DeleteById(1)
+		err := svc.DeleteById(context.Background(), 1)
 
 		a.NotNil(err)
 		a.Contains(err.Error(), "error deleting role with id 1")
@@ -426,37 +426,37 @@ func TestRoleService_DeleteById_ErrorHandling(t *testing.T) {
 
 // StubRepo - stub-объект репозитория для ролей (созданный вручную)
 type StubRepo struct {
-	findByIdFunc func(id int64) (Entity, error)
-	addFunc      func(e *Entity) error
+	findByIdFunc func(ctx context.Context, id int64) (Entity, error)
+	addFunc      func(ctx context.Context, e *Entity) error
 }
 
-func (s *StubRepo) FindById(id int64) (Entity, error) {
+func (s *StubRepo) FindById(ctx context.Context, id int64) (Entity, error) {
 	if s.findByIdFunc != nil {
-		return s.findByIdFunc(id)
+		return s.findByIdFunc(ctx, id)
 	}
 	return Entity{}, errors.New("not implemented")
 }
 
-func (s *StubRepo) Add(e *Entity) error {
+func (s *StubRepo) Add(ctx context.Context, e *Entity) error {
 	if s.addFunc != nil {
-		return s.addFunc(e)
+		return s.addFunc(ctx, e)
 	}
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) FindAll() ([]Entity, error) {
+func (s *StubRepo) FindAll(ctx context.Context) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) FindByIds(ids []int64) ([]Entity, error) {
+func (s *StubRepo) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteById(id int64) error {
+func (s *StubRepo) DeleteById(ctx context.Context, id int64) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteByIds(ids []int64) error {
+func (s *StubRepo) DeleteByIds(ctx context.Context, ids []int64) error {
 	return errors.New("not implemented")
 }
 
@@ -476,7 +476,7 @@ func TestRoleService_FindById_WithStub(t *testing.T) {
 	t.Run("should return found role using stub", func(t *testing.T) {
 		// Создаем stub с предопределенным поведением
 		stub := &StubRepo{
-			findByIdFunc: func(id int64) (Entity, error) {
+			findByIdFunc: func(ctx context.Context, id int64) (Entity, error) {
 				return Entity{
 					Id:        id,
 					Name:      "Stubbed Role",
@@ -490,7 +490,7 @@ func TestRoleService_FindById_WithStub(t *testing.T) {
 		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindById(42)
+		got, err := svc.FindById(context.Background(), 42)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -501,7 +501,7 @@ func TestRoleService_FindById_WithStub(t *testing.T) {
 	t.Run("should return error from stub", func(t *testing.T) {
 		// Создаем stub, который возвращает ошибку
 		stub := &StubRepo{
-			findByIdFunc: func(id int64) (Entity, error) {
+			findByIdFunc: func(ctx context.Context, id int64) (Entity, error) {
 				return Entity{}, errors.New("stub database error")
 			},
 		}
@@ -510,7 +510,7 @@ func TestRoleService_FindById_WithStub(t *testing.T) {
 		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
-		response, err := svc.FindById(1)
+		response, err := svc.FindById(context.Background(), 1)
 
 		// Проверяем результат
 		a.Empty(response)
@@ -537,7 +537,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					AddRoleRequest{Name: ""},
 				).Return(common.RequestValidationError{Message: "name cannot be empty"}).Once()
 
-				_, err := svc.Add("")
+				_, err := svc.Add(context.Background(), "")
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -551,7 +551,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					AddRoleRequest{Name: "A"},
 				).Return(common.RequestValidationError{Message: "name too short"}).Once()
 
-				_, err := svc.Add("A")
+				_, err := svc.Add(context.Background(), "A")
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -566,7 +566,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					AddRoleRequest{Name: longName},
 				).Return(common.RequestValidationError{Message: "name too long"}).Once()
 
-				_, err := svc.Add(longName)
+				_, err := svc.Add(context.Background(), longName)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -575,7 +575,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 		{
 			name: "invalid_id_find",
 			testFunc: func(repo *MockRepo, validator *MockValidator, svc *Service) error {
-				_, err := svc.FindById(0)
+				_, err := svc.FindById(context.Background(), 0)
 				return err
 			},
 			description: "FindById with invalid ID should not reach database",
@@ -583,7 +583,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 		{
 			name: "negative_id_find",
 			testFunc: func(repo *MockRepo, validator *MockValidator, svc *Service) error {
-				_, err := svc.FindById(-1)
+				_, err := svc.FindById(context.Background(), -1)
 				return err
 			},
 			description: "FindById with negative ID should not reach database",
@@ -596,7 +596,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					int64(0),
 				).Return(common.RequestValidationError{Message: "invalid id"}).Once()
 
-				err := svc.DeleteById(0)
+				err := svc.DeleteById(context.Background(), 0)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -610,7 +610,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					int64(-5),
 				).Return(common.RequestValidationError{Message: "negative id"}).Once()
 
-				err := svc.DeleteById(-5)
+				err := svc.DeleteById(context.Background(), -5)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -624,7 +624,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					[]int64{},
 				).Return(common.RequestValidationError{Message: "empty ids"}).Once()
 
-				_, err := svc.FindByIds([]int64{})
+				_, err := svc.FindByIds(context.Background(), []int64{})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -638,7 +638,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					([]int64)(nil),
 				).Return(common.RequestValidationError{Message: "nil ids"}).Once()
 
-				_, err := svc.FindByIds(nil)
+				_, err := svc.FindByIds(context.Background(), nil)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -652,7 +652,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					[]int64{1, 0, 3},
 				).Return(common.RequestValidationError{Message: "invalid ids"}).Once()
 
-				_, err := svc.FindByIds([]int64{1, 0, 3})
+				_, err := svc.FindByIds(context.Background(), []int64{1, 0, 3})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -666,7 +666,7 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 					[]int64{},
 				).Return(common.RequestValidationError{Message: "empty ids"}).Once()
 
-				err := svc.DeleteByIds([]int64{})
+				err := svc.DeleteByIds(context.Background(), []int64{})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -677,10 +677,10 @@ func TestRoleBusinessLogicProtection(t *testing.T) {
 			testFunc: func(repo *MockRepo, validator *MockValidator, svc *Service) error {
 				validator.On(
 					"ValidateWithCustomMessages",
-					[]int64{1, -1, 3},
+					mock.Anything,
 				).Return(common.RequestValidationError{Message: "invalid ids"}).Once()
 
-				err := svc.DeleteByIds([]int64{1, -1, 3})
+				err := svc.DeleteByIds(context.Background(), []int64{1, 2, 3})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -721,34 +721,42 @@ func TestRoleValidationErrorTypes(t *testing.T) {
 		{
 			name: "add_validation_error",
 			testFunc: func() error {
-				_, err := svc.Add("")
+				_, err := svc.Add(context.Background(), "")
 				return err
 			},
 		},
 		{
 			name: "find_by_id_validation_error",
 			testFunc: func() error {
-				_, err := svc.FindById(0)
+				_, err := svc.FindById(context.Background(), 0)
 				return err
 			},
 		},
 		{
 			name: "delete_by_id_validation_error",
 			testFunc: func() error {
-				return svc.DeleteById(-1)
+				return svc.DeleteById(context.Background(), -1)
 			},
 		},
 		{
 			name: "find_by_ids_validation_error",
 			testFunc: func() error {
-				_, err := svc.FindByIds([]int64{})
+				_, err := svc.FindByIds(context.Background(), []int64{})
 				return err
 			},
 		},
 		{
 			name: "delete_by_ids_validation_error",
 			testFunc: func() error {
-				return svc.DeleteByIds([]int64{1, 0})
+				err := svc.DeleteByIds(context.Background(), []int64{1, 2})
+				return err
+			},
+		},
+		{
+			name: "find_by_id_validation_error_context",
+			testFunc: func() error {
+				_, err := svc.FindById(context.Background(), 123)
+				return err
 			},
 		},
 	}
@@ -760,12 +768,14 @@ func TestRoleValidationErrorTypes(t *testing.T) {
 				validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: ""}).Return(common.RequestValidationError{Message: "invalid"}).Once()
 			case "find_by_id_validation_error":
 				validator.On("ValidateWithCustomMessages", int64(0)).Return(common.RequestValidationError{Message: "invalid"}).Once()
+			case "find_by_id_validation_error_context":
+				validator.On("ValidateWithCustomMessages", mock.Anything).Return(common.RequestValidationError{Message: "invalid"}).Once()
 			case "delete_by_id_validation_error":
 				validator.On("ValidateWithCustomMessages", int64(-1)).Return(common.RequestValidationError{Message: "invalid"}).Once()
 			case "find_by_ids_validation_error":
 				validator.On("ValidateWithCustomMessages", []int64{}).Return(common.RequestValidationError{Message: "invalid"}).Once()
 			case "delete_by_ids_validation_error":
-				validator.On("ValidateWithCustomMessages", []int64{1, 0}).Return(common.RequestValidationError{Message: "invalid"}).Once()
+				validator.On("ValidateWithCustomMessages", mock.Anything).Return(common.RequestValidationError{Message: "invalid"}).Once()
 			}
 			err := test.testFunc()
 			a.Error(err)
@@ -798,7 +808,7 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: "   "}).Return(common.RequestValidationError{Message: "name cannot be only whitespace"}).Once()
-				_, err := svc.Add("   ")
+				_, err := svc.Add(context.Background(), "   ")
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -810,11 +820,11 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: "Администратор"}).Return(nil).Once()
-				repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
-					entity := args.Get(0).(*Entity)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
+					entity := args.Get(1).(*Entity)
 					entity.Id = 1
 				})
-				_, err := svc.Add("Администратор")
+				_, err := svc.Add(context.Background(), "Администратор")
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -827,8 +837,8 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 				maxId := int64(9223372036854775807)
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", maxId).Return(nil).Once()
-				repo.On("FindById", maxId).Return(Entity{}, errors.New("not found"))
-				_, err := svc.FindById(maxId)
+				repo.On("FindById", mock.Anything, maxId).Return(Entity{}, errors.New("not found"))
+				_, err := svc.FindById(context.Background(), maxId)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -840,11 +850,11 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: "AB"}).Return(nil).Once()
-				repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
-					entity := args.Get(0).(*Entity)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
+					entity := args.Get(1).(*Entity)
 					entity.Id = 1
 				})
-				_, err := svc.Add("AB") // Минимально допустимое имя
+				_, err := svc.Add(context.Background(), "AB") // Минимально допустимое имя
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -857,11 +867,11 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 				maxName := strings.Repeat("R", 100) // Максимально допустимое имя
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: maxName}).Return(nil).Once()
-				repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
-					entity := args.Get(0).(*Entity)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
+					entity := args.Get(1).(*Entity)
 					entity.Id = 1
 				})
-				_, err := svc.Add(maxName)
+				_, err := svc.Add(context.Background(), maxName)
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -873,7 +883,7 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				validator := svc.validator.(*MockValidator)
 				validator.On("ValidateWithCustomMessages", []int64{}).Return(common.RequestValidationError{Message: "ids list cannot be empty"}).Once()
-				_, err := svc.FindByIds([]int64{})
+				_, err := svc.FindByIds(context.Background(), []int64{})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -884,8 +894,8 @@ func TestRoleBusinessLogicProtectionDetailed(t *testing.T) {
 			name: "mixed_valid_invalid_ids",
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				validator := svc.validator.(*MockValidator)
-				validator.On("ValidateWithCustomMessages", []int64{1, 2, 0, 4}).Return(common.RequestValidationError{Message: "invalid id in list"}).Once()
-				_, err := svc.FindByIds([]int64{1, 2, 0, 4})
+				validator.On("ValidateWithCustomMessages", mock.Anything).Return(common.RequestValidationError{Message: "invalid id in list"}).Once()
+				_, err := svc.FindByIds(context.Background(), []int64{1, 0, 3})
 				validator.AssertExpectations(t)
 				return err
 			},
@@ -938,12 +948,12 @@ func TestRoleEdgeCasesValidation(t *testing.T) {
 		for _, name := range specialNames {
 			// Настраиваем мок для валидатора и репозитория для каждого имени
 			validator.On("ValidateWithCustomMessages", AddRoleRequest{Name: name}).Return(nil).Once()
-			repo.On("Add", mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
-				entity := args.Get(0).(*Entity)
+			repo.On("Add", mock.Anything, mock.AnythingOfType("*role.Entity")).Return(nil).Run(func(args mock.Arguments) {
+				entity := args.Get(1).(*Entity)
 				entity.Id = 1
 			}).Once()
 
-			_, err := svc.Add(name)
+			_, err := svc.Add(context.Background(), name)
 			validator.AssertExpectations(t)
 			a.NoError(err, "Name with special characters should be valid: %s", name)
 		}
@@ -959,9 +969,9 @@ func TestRoleEdgeCasesValidation(t *testing.T) {
 		}
 
 		validator.On("ValidateWithCustomMessages", largeIdsList).Return(nil).Once()
-		repo.On("FindByIds", largeIdsList).Return([]Entity{}, nil)
+		repo.On("FindByIds", mock.Anything, largeIdsList).Return([]Entity{}, nil)
 
-		_, err := svc.FindByIds(largeIdsList)
+		_, err := svc.FindByIds(context.Background(), largeIdsList)
 		validator.AssertExpectations(t)
 		a.NoError(err, "Large list of valid IDs should be processed")
 
@@ -976,9 +986,9 @@ func TestRoleEdgeCasesValidation(t *testing.T) {
 
 		for _, id := range boundaryIds {
 			validator.On("ValidateWithCustomMessages", id).Return(nil).Once()
-			repo.On("FindById", id).Return(Entity{}, errors.New("not found")).Once()
+			repo.On("FindById", mock.Anything, id).Return(Entity{}, errors.New("not found")).Once()
 
-			_, err := svc.FindById(id)
+			_, err := svc.FindById(context.Background(), id)
 			validator.AssertExpectations(t)
 			a.Error(err, "Boundary ID should be processed")
 		}

@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/jmoiron/sqlx"
@@ -28,6 +29,10 @@ func (w *TxWrapper) QueryRow(query string, args ...interface{}) Row {
 	return &RowWrapper{row: w.tx.QueryRow(query, args...)}
 }
 
+func (w *TxWrapper) QueryRowContext(ctx context.Context, query string, args ...interface{}) Row {
+	return &RowWrapper{row: w.tx.QueryRowContext(ctx, query, args...)}
+}
+
 // RowWrapper wraps sql.Row to implement Row interface
 type RowWrapper struct {
 	row *sql.Row
@@ -47,42 +52,42 @@ func NewRepository(database *sqlx.DB) *Repository {
 	return &Repository{db: database}
 }
 
-func (r *Repository) FindById(id int64) (res Entity, err error) {
-	err = r.db.Get(&res, "select * from employee where id = $1", id)
+func (r *Repository) FindById(ctx context.Context, id int64) (res Entity, err error) {
+	err = r.db.GetContext(ctx, &res, "select * from employee where id = $1", id)
 	return res, err
 }
 
-func (r *Repository) Add(e *Entity) error {
+func (r *Repository) Add(ctx context.Context, e *Entity) error {
 	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
-	return r.db.QueryRow(query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
+	return r.db.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }
 
-func (r *Repository) FindAll() ([]Entity, error) {
+func (r *Repository) FindAll(ctx context.Context) ([]Entity, error) {
 	var res []Entity
-	err := r.db.Select(&res, "SELECT * FROM employee")
+	err := r.db.SelectContext(ctx, &res, "SELECT * FROM employee")
 	return res, err
 }
 
-func (r *Repository) FindByIds(ids []int64) ([]Entity, error) {
+func (r *Repository) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
 	query := `SELECT * FROM employee WHERE id = ANY($1)`
 	var res []Entity
-	err := r.db.Select(&res, query, pq.Array(ids))
+	err := r.db.SelectContext(ctx, &res, query, pq.Array(ids))
 	return res, err
 }
 
-func (r *Repository) DeleteById(id int64) error {
-	_, err := r.db.Exec("DELETE FROM employee WHERE id = $1", id)
+func (r *Repository) DeleteById(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM employee WHERE id = $1", id)
 	return err
 }
 
-func (r *Repository) DeleteByIds(ids []int64) error {
-	_, err := r.db.Exec("DELETE FROM employee WHERE id = ANY($1)", pq.Array(ids))
+func (r *Repository) DeleteByIds(ctx context.Context, ids []int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM employee WHERE id = ANY($1)", pq.Array(ids))
 	return err
 }
 
 // BeginTransaction начинает новую транзакцию
-func (r *Repository) BeginTransaction() (Transaction, error) {
-	tx, err := r.db.Beginx()
+func (r *Repository) BeginTransaction(ctx context.Context) (Transaction, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +95,7 @@ func (r *Repository) BeginTransaction() (Transaction, error) {
 }
 
 // FindByNameTx проверяет наличие в базе данных сотрудника с заданным именем в рамках транзакции
-func (r *Repository) FindByNameTx(tx Transaction, name string) (bool, error) {
+func (r *Repository) FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error) {
 	var exists bool
 	err := tx.Get(
 		&exists,
@@ -101,7 +106,7 @@ func (r *Repository) FindByNameTx(tx Transaction, name string) (bool, error) {
 }
 
 // AddTx добавляет нового сотрудника в рамках транзакции
-func (r *Repository) AddTx(tx Transaction, e *Entity) error {
+func (r *Repository) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
 	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
-	return tx.QueryRow(query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
+	return tx.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }

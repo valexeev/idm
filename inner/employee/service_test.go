@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"idm/inner/common"
@@ -19,51 +20,51 @@ type MockRepo struct {
 	mock.Mock
 }
 
-func (m *MockRepo) FindById(id int64) (Entity, error) {
-	args := m.Called(id)
+func (m *MockRepo) FindById(ctx context.Context, id int64) (Entity, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(Entity), args.Error(1)
 }
 
-func (m *MockRepo) Add(e *Entity) error {
-	args := m.Called(e)
+func (m *MockRepo) Add(ctx context.Context, e *Entity) error {
+	args := m.Called(ctx, e)
 	return args.Error(0)
 }
 
-func (m *MockRepo) FindAll() ([]Entity, error) {
-	args := m.Called()
+func (m *MockRepo) FindAll(ctx context.Context) ([]Entity, error) {
+	args := m.Called(ctx)
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
-func (m *MockRepo) FindByIds(ids []int64) ([]Entity, error) {
-	args := m.Called(ids)
+func (m *MockRepo) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
+	args := m.Called(ctx, ids)
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
-func (m *MockRepo) DeleteById(id int64) error {
-	args := m.Called(id)
+func (m *MockRepo) DeleteById(ctx context.Context, id int64) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockRepo) DeleteByIds(ids []int64) error {
-	args := m.Called(ids)
+func (m *MockRepo) DeleteByIds(ctx context.Context, ids []int64) error {
+	args := m.Called(ctx, ids)
 	return args.Error(0)
 }
 
-func (m *MockRepo) BeginTransaction() (Transaction, error) {
-	args := m.Called()
+func (m *MockRepo) BeginTransaction(ctx context.Context) (Transaction, error) {
+	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(Transaction), args.Error(1)
 }
 
-func (m *MockRepo) FindByNameTx(tx Transaction, name string) (bool, error) {
-	args := m.Called(tx, name)
+func (m *MockRepo) FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error) {
+	args := m.Called(ctx, tx, name)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockRepo) AddTx(tx Transaction, e *Entity) error {
-	args := m.Called(tx, e)
+func (m *MockRepo) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
+	args := m.Called(ctx, tx, e)
 	return args.Error(0)
 }
 
@@ -96,10 +97,10 @@ func TestEmployeeService_FindById(t *testing.T) {
 		want := entity.toResponse()
 
 		// Настраиваем поведение mock
-		repo.On("FindById", int64(1)).Return(entity, nil)
+		repo.On("FindById", mock.Anything, int64(1)).Return(entity, nil)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindById(1)
+		got, err := svc.FindById(context.Background(), 1)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -113,7 +114,7 @@ func TestEmployeeService_FindById(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Тестируем валидацию
-		response, err := svc.FindById(0)
+		response, err := svc.FindById(context.Background(), 0)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -132,10 +133,10 @@ func TestEmployeeService_FindById(t *testing.T) {
 		want := fmt.Errorf("error finding employee with id 1: %w", repoErr)
 
 		// Настраиваем mock для возврата ошибки
-		repo.On("FindById", int64(1)).Return(entity, repoErr)
+		repo.On("FindById", mock.Anything, int64(1)).Return(entity, repoErr)
 
 		// Вызываем тестируемый метод
-		response, got := svc.FindById(1)
+		response, got := svc.FindById(context.Background(), 1)
 
 		// Проверяем результат
 		a.Empty(response)
@@ -154,13 +155,13 @@ func TestEmployeeService_Add(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Настраиваем mock - при вызове Add модифицируем Entity
-		repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
-			entity := args.Get(0).(*Entity)
+		repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
+			entity := args.Get(1).(*Entity)
 			entity.Id = 1 // симулируем присвоение ID в БД
 		})
 
 		// Вызываем тестируемый метод
-		got, err := svc.Add("John Doe")
+		got, err := svc.Add(context.Background(), "John Doe")
 
 		// Проверяем результат
 		a.Nil(err)
@@ -175,7 +176,7 @@ func TestEmployeeService_Add(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Вызываем с пустым именем
-		response, err := svc.Add("")
+		response, err := svc.Add(context.Background(), "")
 
 		// Проверяем результат
 		a.Empty(response)
@@ -190,10 +191,10 @@ func TestEmployeeService_Add(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
-		repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(repoErr)
+		repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(repoErr)
 
 		// Вызываем тестируемый метод
-		response, got := svc.Add("John Doe")
+		response, got := svc.Add(context.Background(), "John Doe")
 
 		// Проверяем результат
 		a.Empty(response)
@@ -216,10 +217,10 @@ func TestEmployeeService_FindAll(t *testing.T) {
 			{Id: 2, Name: "Jane Smith", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		}
 
-		repo.On("FindAll").Return(entities, nil)
+		repo.On("FindAll", mock.Anything).Return(entities, nil)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindAll()
+		got, err := svc.FindAll(context.Background())
 
 		// Проверяем результат
 		a.Nil(err)
@@ -235,10 +236,10 @@ func TestEmployeeService_FindAll(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		repoErr := errors.New("database error")
-		repo.On("FindAll").Return([]Entity{}, repoErr)
+		repo.On("FindAll", mock.Anything).Return([]Entity{}, repoErr)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindAll()
+		got, err := svc.FindAll(context.Background())
 
 		// Проверяем результат
 		a.Nil(got)
@@ -255,10 +256,10 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 		repo := new(MockRepo)
 		validator := validator.New()
 		svc := NewService(repo, validator)
-		repo.On("DeleteById", int64(1)).Return(nil)
+		repo.On("DeleteById", mock.Anything, int64(1)).Return(nil)
 
 		// Вызываем тестируемый метод
-		err := svc.DeleteById(1)
+		err := svc.DeleteById(context.Background(), 1)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -271,7 +272,7 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Вызываем с невалидным ID
-		err := svc.DeleteById(0)
+		err := svc.DeleteById(context.Background(), 0)
 
 		// Проверяем результат
 		a.NotNil(err)
@@ -282,50 +283,49 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 
 // StubRepo - stub-объект репозитория (созданный вручную)
 type StubRepo struct {
-	findByIdFunc func(id int64) (Entity, error)
-	addFunc      func(e *Entity) error
-	// Остальные методы можем не реализовывать для простоты
+	findByIdFunc func(ctx context.Context, id int64) (Entity, error)
+	addFunc      func(ctx context.Context, e *Entity) error
 }
 
-func (s *StubRepo) FindById(id int64) (Entity, error) {
+func (s *StubRepo) FindById(ctx context.Context, id int64) (Entity, error) {
 	if s.findByIdFunc != nil {
-		return s.findByIdFunc(id)
+		return s.findByIdFunc(ctx, id)
 	}
 	return Entity{}, errors.New("not implemented")
 }
 
-func (s *StubRepo) Add(e *Entity) error {
+func (s *StubRepo) Add(ctx context.Context, e *Entity) error {
 	if s.addFunc != nil {
-		return s.addFunc(e)
+		return s.addFunc(ctx, e)
 	}
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) FindAll() ([]Entity, error) {
+func (s *StubRepo) FindAll(ctx context.Context) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) FindByIds(ids []int64) ([]Entity, error) {
+func (s *StubRepo) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteById(id int64) error {
+func (s *StubRepo) DeleteById(ctx context.Context, id int64) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteByIds(ids []int64) error {
+func (s *StubRepo) DeleteByIds(ctx context.Context, ids []int64) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) BeginTransaction() (Transaction, error) {
+func (s *StubRepo) BeginTransaction(ctx context.Context) (Transaction, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) FindByNameTx(tx Transaction, name string) (bool, error) {
+func (s *StubRepo) FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
-func (s *StubRepo) AddTx(tx Transaction, e *Entity) error {
+func (s *StubRepo) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
 	return errors.New("not implemented")
 }
 
@@ -335,7 +335,7 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 	t.Run("should return found employee using stub", func(t *testing.T) {
 		// Создаем stub с предопределенным поведением
 		stub := &StubRepo{
-			findByIdFunc: func(id int64) (Entity, error) {
+			findByIdFunc: func(ctx context.Context, id int64) (Entity, error) {
 				return Entity{
 					Id:        id,
 					Name:      "Stubbed Employee",
@@ -349,7 +349,7 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindById(42)
+		got, err := svc.FindById(context.Background(), 42)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -360,7 +360,7 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 	t.Run("should return error from stub", func(t *testing.T) {
 		// Создаем stub, который возвращает ошибку
 		stub := &StubRepo{
-			findByIdFunc: func(id int64) (Entity, error) {
+			findByIdFunc: func(ctx context.Context, id int64) (Entity, error) {
 				return Entity{}, errors.New("stub database error")
 			},
 		}
@@ -368,7 +368,7 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 		svc := NewService(stub, validator)
 
 		// Вызываем тестируемый метод
-		response, err := svc.FindById(1)
+		response, err := svc.FindById(context.Background(), 1)
 
 		// Проверяем результат
 		a.Empty(response)
@@ -393,10 +393,10 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 		}
 		ids := []int64{1, 2}
 
-		repo.On("FindByIds", ids).Return(entities, nil)
+		repo.On("FindByIds", mock.Anything, ids).Return(entities, nil)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindByIds(ids)
+		got, err := svc.FindByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -413,10 +413,10 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
-		repo.On("FindByIds", ids).Return([]Entity{}, repoErr)
+		repo.On("FindByIds", mock.Anything, ids).Return([]Entity{}, repoErr)
 
 		// Вызываем тестируемый метод
-		got, err := svc.FindByIds(ids)
+		got, err := svc.FindByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.Nil(got)
@@ -435,10 +435,10 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		ids := []int64{1, 2}
-		repo.On("DeleteByIds", ids).Return(nil)
+		repo.On("DeleteByIds", mock.Anything, ids).Return(nil)
 
 		// Вызываем тестируемый метод
-		err := svc.DeleteByIds(ids)
+		err := svc.DeleteByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.Nil(err)
@@ -452,10 +452,10 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
-		repo.On("DeleteByIds", ids).Return(repoErr)
+		repo.On("DeleteByIds", mock.Anything, ids).Return(repoErr)
 
 		// Вызываем тестируемый метод
-		err := svc.DeleteByIds(ids)
+		err := svc.DeleteByIds(context.Background(), ids)
 
 		// Проверяем результат
 		a.NotNil(err)
@@ -487,6 +487,11 @@ func (m *MockTransaction) Get(dest interface{}, query string, args ...interface{
 func (m *MockTransaction) QueryRow(query string, args ...interface{}) Row {
 	mockArgs := m.Called(query, args)
 	return mockArgs.Get(0).(*MockRow)
+}
+
+func (m *MockTransaction) QueryRowContext(ctx context.Context, query string, args ...interface{}) Row {
+	mockArgs := m.Called(ctx, query, args)
+	return mockArgs.Get(0).(Row)
 }
 
 // MockRow - мок для sql.Row
@@ -619,7 +624,7 @@ func TestService_AddTransactional(t *testing.T) {
 		// Тестируем с пустым именем
 		request := AddEmployeeRequest{Name: ""}
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		// Проверяем, что возвращается ошибка валидации
 		a.Empty(response)
@@ -641,7 +646,7 @@ func TestService_AddTransactional(t *testing.T) {
 
 		request := AddEmployeeRequest{Name: "J"}
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -663,9 +668,9 @@ func TestService_AddTransactional(t *testing.T) {
 		request := AddEmployeeRequest{Name: "John Doe"}
 		transactionErr := errors.New("failed to create transaction")
 
-		repo.On("BeginTransaction").Return(nil, transactionErr)
+		repo.On("BeginTransaction", mock.Anything).Return(nil, transactionErr)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -687,11 +692,11 @@ func TestService_AddTransactional(t *testing.T) {
 
 		request := AddEmployeeRequest{Name: "John Doe"}
 
-		repo.On("BeginTransaction").Return(mockTx, nil)
-		repo.On("FindByNameTx", mockTx, "John Doe").Return(true, nil)
+		repo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+		repo.On("FindByNameTx", mock.Anything, mockTx, "John Doe").Return(true, nil)
 		mockTx.On("Rollback").Return(nil)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -714,12 +719,12 @@ func TestService_AddTransactional(t *testing.T) {
 		request := AddEmployeeRequest{Name: "John Doe"}
 		addErr := errors.New("database insert error")
 
-		repo.On("BeginTransaction").Return(mockTx, nil)
-		repo.On("FindByNameTx", mockTx, "John Doe").Return(false, nil)
-		repo.On("AddTx", mockTx, mock.AnythingOfType("*employee.Entity")).Return(addErr)
+		repo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+		repo.On("FindByNameTx", mock.Anything, mockTx, "John Doe").Return(false, nil)
+		repo.On("AddTx", mock.Anything, mockTx, mock.AnythingOfType("*employee.Entity")).Return(addErr)
 		mockTx.On("Rollback").Return(nil)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -739,12 +744,12 @@ func TestService_AddTransactional(t *testing.T) {
 		addErr := errors.New("database insert error")
 		rollbackErr := errors.New("rollback failed")
 
-		repo.On("BeginTransaction").Return(mockTx, nil)
-		repo.On("FindByNameTx", mockTx, "John Doe").Return(false, nil)
-		repo.On("AddTx", mockTx, mock.AnythingOfType("*employee.Entity")).Return(addErr)
+		repo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+		repo.On("FindByNameTx", mock.Anything, mockTx, "John Doe").Return(false, nil)
+		repo.On("AddTx", mock.Anything, mockTx, mock.AnythingOfType("*employee.Entity")).Return(addErr)
 		mockTx.On("Rollback").Return(rollbackErr)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -762,15 +767,16 @@ func TestService_AddTransactional(t *testing.T) {
 		request := AddEmployeeRequest{Name: "John Doe"}
 		commitErr := errors.New("commit failed")
 
-		repo.On("BeginTransaction").Return(mockTx, nil)
-		repo.On("FindByNameTx", mockTx, "John Doe").Return(false, nil)
-		repo.On("AddTx", mockTx, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
-			entity := args.Get(1).(*Entity)
+		repo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+		repo.On("FindByNameTx", mock.Anything, mockTx, "John Doe").Return(false, nil)
+		repo.On("AddTx", mock.Anything, mockTx, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
+			entity := args.Get(2).(*Entity)
 			entity.Id = 1
 		})
 		mockTx.On("Commit").Return(commitErr)
+		mockTx.On("Rollback").Return(nil)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Empty(response, "Response should be empty on commit error")
 		a.NotNil(err)
@@ -786,15 +792,16 @@ func TestService_AddTransactional(t *testing.T) {
 
 		request := AddEmployeeRequest{Name: "John Doe"}
 
-		repo.On("BeginTransaction").Return(mockTx, nil)
-		repo.On("FindByNameTx", mockTx, "John Doe").Return(false, nil)
-		repo.On("AddTx", mockTx, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
-			entity := args.Get(1).(*Entity)
+		repo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+		repo.On("FindByNameTx", mock.Anything, mockTx, "John Doe").Return(false, nil)
+		repo.On("AddTx", mock.Anything, mockTx, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
+			entity := args.Get(2).(*Entity)
 			entity.Id = 1
 		})
 		mockTx.On("Commit").Return(nil)
+		mockTx.On("Rollback").Return(nil)
 
-		response, err := svc.AddTransactional(request)
+		response, err := svc.AddTransactional(context.Background(), request)
 
 		a.Nil(err)
 		a.NotEmpty(response)
@@ -816,7 +823,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Тестируем с невалидным ID
-		response, err := svc.FindById(-1)
+		response, err := svc.FindById(context.Background(), -1)
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -833,7 +840,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 		validator := validator.New()
 		svc := NewService(repo, validator)
 
-		response, err := svc.Add("")
+		response, err := svc.Add(context.Background(), "")
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -851,7 +858,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 		svc := NewService(repo, validator)
 
 		// Слишком короткое имя
-		response, err := svc.Add("J")
+		response, err := svc.Add(context.Background(), "J")
 
 		a.Empty(response)
 		a.NotNil(err)
@@ -867,7 +874,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 		validator := validator.New()
 		svc := NewService(repo, validator)
 
-		err := svc.DeleteById(0)
+		err := svc.DeleteById(context.Background(), 0)
 
 		a.NotNil(err)
 		a.Contains(err.Error(), "invalid employee id: 0")
@@ -880,7 +887,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 		validator := validator.New()
 		svc := NewService(repo, validator)
 
-		err := svc.DeleteById(-5)
+		err := svc.DeleteById(context.Background(), -5)
 
 		a.NotNil(err)
 		a.Contains(err.Error(), "invalid employee id: -5")
@@ -901,7 +908,7 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 		{
 			name: "empty_name_add",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				_, err := svc.Add("")
+				_, err := svc.Add(context.Background(), "")
 				return err
 			},
 			description: "Add with empty name should not reach database",
@@ -909,7 +916,7 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 		{
 			name: "short_name_add",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				_, err := svc.Add("J")
+				_, err := svc.Add(context.Background(), "J")
 				return err
 			},
 			description: "Add with short name should not reach database",
@@ -917,7 +924,7 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 		{
 			name: "empty_name_transactional",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				_, err := svc.AddTransactional(AddEmployeeRequest{Name: ""})
+				_, err := svc.AddTransactional(context.Background(), AddEmployeeRequest{Name: ""})
 				return err
 			},
 			description: "AddTransactional with empty name should not reach database",
@@ -925,7 +932,7 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 		{
 			name: "invalid_id_find",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				_, err := svc.FindById(0)
+				_, err := svc.FindById(context.Background(), 0)
 				return err
 			},
 			description: "FindById with invalid ID should not reach database",
@@ -933,7 +940,7 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 		{
 			name: "invalid_id_delete",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				return svc.DeleteById(-1)
+				return svc.DeleteById(context.Background(), -1)
 			},
 			description: "DeleteById with invalid ID should not reach database",
 		},
@@ -989,8 +996,8 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 
 		// Тест с именем ровно 2 символа
 		validName := "Jo"
-		repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil).Once()
-		_, err := svc.Add(validName)
+		repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Once()
+		_, err := svc.Add(context.Background(), validName)
 		require.NoError(t, err)
 		// Это должно пройти валидацию, но может упасть на уровне репозитория
 		// Главное - валидация должна пройти успешно
@@ -999,7 +1006,7 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 		repo2 := new(MockRepo)
 		svc2 := NewService(repo2, validator)
 
-		_, err = svc2.Add("J")
+		_, err = svc2.Add(context.Background(), "J")
 		a.NotNil(err)
 		validationErr, ok := err.(common.RequestValidationError)
 		a.True(ok)
@@ -1012,12 +1019,11 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 			maxValidName = maxValidName[:i] + "a" + maxValidName[i+1:]
 		}
 		repo3 := new(MockRepo)
-		repo3.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil).Once()
+		repo3.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Once()
 		svc3 := NewService(repo3, validator)
 
-		_, err = svc3.Add(maxValidName)
+		_, err = svc3.Add(context.Background(), maxValidName)
 		require.NoError(t, err)
-		// Валидация должна пройти успешно
 
 		// Тест с именем 101 символ (invalid)
 		repo4 := new(MockRepo)
@@ -1025,7 +1031,7 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 		svc4 := NewService(repo4, validator)
 
 		tooLongName := maxValidName + "a"
-		_, err = svc4.Add(tooLongName)
+		_, err = svc4.Add(context.Background(), tooLongName)
 		a.NotNil(err)
 		validationErr, ok = err.(common.RequestValidationError)
 		a.True(ok)
@@ -1047,7 +1053,7 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 		{
 			name: "whitespace_only_name",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				_, err := svc.Add("   ")
+				_, err := svc.Add(context.Background(), "   ")
 				return err
 			},
 			description:  "Whitespace-only name validation",
@@ -1056,12 +1062,12 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 		{
 			name: "unicode_name_valid",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
-					entity := args.Get(0).(*Entity)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
+					entity := args.Get(1).(*Entity)
 					entity.Id = 1
 					entity.Name = "Владимир"
 				})
-				_, err := svc.Add("Владимир")
+				_, err := svc.Add(context.Background(), "Владимир")
 				return err
 			},
 			description:  "Unicode name should reach database",
@@ -1071,9 +1077,9 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 			name: "boundary_max_id",
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				maxId := int64(9223372036854775807)
-				repo.On("FindById", maxId).Return(
+				repo.On("FindById", mock.Anything, maxId).Return(
 					Entity{}, common.NotFoundError{Message: "not found"})
-				_, err := svc.FindById(maxId)
+				_, err := svc.FindById(context.Background(), maxId)
 				return err
 			},
 			description:  "Maximum int64 ID should reach database",
@@ -1083,7 +1089,7 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 			name: "multiple_validation_errors",
 			testFunc: func(repo *MockRepo, svc *Service) error {
 				// Пустой список ID - должен провалить валидацию
-				_, err := svc.FindByIds([]int64{})
+				_, err := svc.FindByIds(context.Background(), []int64{})
 				return err
 			},
 			description:  "Multiple validation errors should not reach database",
@@ -1098,12 +1104,12 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 			// ✅ Вместо фиксированного списка On() — ставим switch:
 			switch pt.name {
 			case "whitespace_only_name":
-				repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil)
 			case "unicode_name_valid":
-				repo.On("Add", mock.AnythingOfType("*employee.Entity")).Return(nil)
+				repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil)
 			case "boundary_max_id":
 				maxId := int64(9223372036854775807)
-				repo.On("FindById", maxId).Return(
+				repo.On("FindById", mock.Anything, maxId).Return(
 					Entity{}, common.NotFoundError{Message: "not found"})
 			case "multiple_validation_errors":
 
@@ -1144,28 +1150,28 @@ func TestValidationErrorTypes(t *testing.T) {
 		{
 			name: "add_validation_error",
 			testFunc: func() error {
-				_, err := svc.Add("")
+				_, err := svc.Add(context.Background(), "")
 				return err
 			},
 		},
 		{
 			name: "add_transactional_validation_error",
 			testFunc: func() error {
-				_, err := svc.AddTransactional(AddEmployeeRequest{Name: ""})
+				_, err := svc.AddTransactional(context.Background(), AddEmployeeRequest{Name: ""})
 				return err
 			},
 		},
 		{
 			name: "find_by_id_validation_error",
 			testFunc: func() error {
-				_, err := svc.FindById(0)
+				_, err := svc.FindById(context.Background(), 0)
 				return err
 			},
 		},
 		{
 			name: "delete_by_id_validation_error",
 			testFunc: func() error {
-				return svc.DeleteById(-1)
+				return svc.DeleteById(context.Background(), -1)
 			},
 		},
 	}
