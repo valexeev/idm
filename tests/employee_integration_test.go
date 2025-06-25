@@ -129,6 +129,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		// Теперь проверяем в транзакции
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
+
 		defer func() {
 			// Обрабатываем ошибку rollback корректно
 			if err := tx.Rollback(); err != nil && err.Error() != "sql: transaction has already been committed or rolled back" {
@@ -139,6 +140,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		exists, err := employeeRepo.FindByNameTx(ctx, tx, "Existing Employee")
 		assert.NoError(t, err)
 		assert.True(t, exists)
+
 	})
 
 	t.Run("should create employee using AddTx method", func(t *testing.T) {
@@ -182,7 +184,6 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		ctx := context.Background()
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
-
 		now := time.Now()
 
 		// Создаем первого сотрудника
@@ -213,7 +214,6 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		saved1, err := employeeRepo.FindById(ctx, employee1.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "Employee 1", saved1.Name)
-
 		saved2, err := employeeRepo.FindById(ctx, employee2.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "Employee 2", saved2.Name)
