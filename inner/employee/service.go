@@ -38,6 +38,8 @@ type Repo interface {
 	BeginTransaction(ctx context.Context) (Transaction, error)
 	FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error)
 	AddTx(ctx context.Context, tx Transaction, e *Entity) error
+	FindPage(ctx context.Context, limit, offset int) ([]Entity, error)
+	CountAll(ctx context.Context) (int64, error)
 }
 
 type Validator interface {
@@ -51,6 +53,44 @@ func (svc *Service) ValidateRequest(request interface{}) error {
 		return common.RequestValidationError{Message: err.Error()}
 	}
 	return nil
+}
+
+type PageRequest struct {
+	PageSize   int `validate:"min=1,max=100"`
+	PageNumber int `validate:"min=0"`
+}
+
+type PageResponse struct {
+	Result     []Response `json:"result"`
+	PageSize   int        `json:"page_size"`
+	PageNumber int        `json:"page_number"`
+	Total      int64      `json:"total"`
+}
+
+// FindPage возвращает страницу сотрудников с учетом пагинации
+func (svc *Service) FindPage(ctx context.Context, req PageRequest) (PageResponse, error) {
+	if err := svc.validator.ValidateWithCustomMessages(req); err != nil {
+		return PageResponse{}, common.RequestValidationError{Message: err.Error()}
+	}
+	offset := req.PageNumber * req.PageSize
+	entities, err := svc.repo.FindPage(ctx, req.PageSize, offset)
+	if err != nil {
+		return PageResponse{}, err
+	}
+	total, err := svc.repo.CountAll(ctx)
+	if err != nil {
+		return PageResponse{}, err
+	}
+	responses := make([]Response, len(entities))
+	for i, e := range entities {
+		responses[i] = e.toResponse()
+	}
+	return PageResponse{
+		Result:     responses,
+		PageSize:   req.PageSize,
+		PageNumber: req.PageNumber,
+		Total:      total,
+	}, nil
 }
 
 // AddTransactional транзакционно добавляет нового сотрудника

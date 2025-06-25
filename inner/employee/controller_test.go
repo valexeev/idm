@@ -60,6 +60,11 @@ func (m *MockEmployeeService) DeleteByIds(ctx context.Context, ids []int64) erro
 	return args.Error(0)
 }
 
+func (m *MockEmployeeService) FindPage(ctx context.Context, req PageRequest) (PageResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(PageResponse), args.Error(1)
+}
+
 // setupTest инициализирует тестовое окружение
 func setupTest(t *testing.T) (*fiber.App, *MockEmployeeService) {
 	t.Helper()

@@ -78,6 +78,11 @@ func (m *MockRepo) RollbackTransaction(tx *sqlx.Tx) error {
 	return args.Error(0)
 }
 
+func (m *MockRepo) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
+	args := m.Called(ctx, limit, offset)
+	return args.Get(0).([]Entity), args.Error(1)
+}
+
 func TestEmployeeService_FindById(t *testing.T) {
 	a := assert.New(t)
 
@@ -281,6 +286,56 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 	})
 }
 
+// TestEmployeeService_FindPage_Validation проверяет валидацию параметров пагинации
+func TestEmployeeService_FindPage_Validation(t *testing.T) {
+	a := assert.New(t)
+
+	t.Run("should return error if PageSize < 1", func(t *testing.T) {
+		repo := new(MockRepo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
+
+		req := PageRequest{PageSize: 0, PageNumber: 0}
+		_, err := svc.FindPage(context.Background(), req)
+
+		a.Error(err)
+		validationErr, ok := err.(common.RequestValidationError)
+		a.True(ok)
+		a.Contains(validationErr.Message, "pagesize must be at least 1")
+		a.True(repo.AssertNumberOfCalls(t, "FindPage", 0))
+	})
+
+	t.Run("should return error if PageSize > 100", func(t *testing.T) {
+		repo := new(MockRepo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
+
+		req := PageRequest{PageSize: 101, PageNumber: 0}
+		_, err := svc.FindPage(context.Background(), req)
+
+		a.Error(err)
+		validationErr, ok := err.(common.RequestValidationError)
+		a.True(ok)
+		a.Contains(validationErr.Message, "pagesize must be at most 100")
+		a.True(repo.AssertNumberOfCalls(t, "FindPage", 0))
+	})
+
+	t.Run("should return error if PageNumber < 0", func(t *testing.T) {
+		repo := new(MockRepo)
+		validator := validator.New()
+		svc := NewService(repo, validator)
+
+		req := PageRequest{PageSize: 10, PageNumber: -1}
+		_, err := svc.FindPage(context.Background(), req)
+
+		a.Error(err)
+		validationErr, ok := err.(common.RequestValidationError)
+		a.True(ok)
+		a.Contains(validationErr.Message, "pagenumber must be at least 0")
+		a.True(repo.AssertNumberOfCalls(t, "FindPage", 0))
+	})
+}
+
 // StubRepo - stub-объект репозитория (созданный вручную)
 type StubRepo struct {
 	findByIdFunc func(ctx context.Context, id int64) (Entity, error)
@@ -327,6 +382,18 @@ func (s *StubRepo) FindByNameTx(ctx context.Context, tx Transaction, name string
 
 func (s *StubRepo) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
 	return errors.New("not implemented")
+}
+
+func (s *StubRepo) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *StubRepo) CountAll(ctx context.Context) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+func (m *MockRepo) CountAll(ctx context.Context) (int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func TestEmployeeService_FindById_WithStub(t *testing.T) {
