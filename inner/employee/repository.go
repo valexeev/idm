@@ -3,7 +3,6 @@ package employee
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -96,7 +95,7 @@ func (r *Repository) BeginTransaction(ctx context.Context) (Transaction, error) 
 }
 
 // FindByNameTx проверяет наличие в базе данных сотрудника с заданным именем в рамках транзакции
-func (r *Repository) FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error) {
+func (r *Repository) FindByNameTx(_ context.Context, tx Transaction, name string) (bool, error) {
 	var exists bool
 	err := tx.Get(
 		&exists,
@@ -112,18 +111,52 @@ func (r *Repository) AddTx(ctx context.Context, tx Transaction, e *Entity) error
 	return tx.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }
 
-// FindPage возвращает сотрудников с учетом пагинации (limit, offset)
-func (r *Repository) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
+// FindPage возвращает сотрудников с учетом пагинации (limit, offset, textFilter)
+func (r *Repository) FindPage(ctx context.Context, limit, offset int, textFilter string) ([]Entity, error) {
 	var res []Entity
-	fmt.Printf("[DEBUG] FindPage: limit=%d, offset=%d\n", limit, offset)
-	err := r.db.SelectContext(ctx, &res, "SELECT * FROM employee LIMIT $1 OFFSET $2", limit, offset)
-	fmt.Printf("[DEBUG] FindPage result: %v, err: %v\n", res, err)
+	var (
+		query string
+		args  []interface{}
+	)
+	baseQuery := "SELECT * FROM employee WHERE 1=1"
+	if validTextFilter(textFilter) {
+		baseQuery += " AND name ilike $1"
+		args = append(args, "%"+textFilter+"%")
+		baseQuery += " OFFSET $2 LIMIT $3"
+		args = append(args, offset, limit)
+	} else {
+		baseQuery += " OFFSET $1 LIMIT $2"
+		args = append(args, offset, limit)
+	}
+	query = baseQuery
+	err := r.db.SelectContext(ctx, &res, query, args...)
 	return res, err
 }
 
-// CountAll возвращает общее количество сотрудников
-func (r *Repository) CountAll(ctx context.Context) (int64, error) {
+// CountAll возвращает общее количество сотрудников с учетом фильтра
+func (r *Repository) CountAll(ctx context.Context, textFilter string) (int64, error) {
 	var total int64
-	err := r.db.GetContext(ctx, &total, "SELECT COUNT(*) FROM employee")
+	var (
+		query string
+		args  []interface{}
+	)
+	baseQuery := "SELECT COUNT(*) FROM employee WHERE 1=1"
+	if validTextFilter(textFilter) {
+		baseQuery += " AND name ilike $1"
+		args = append(args, "%"+textFilter+"%")
+	}
+	query = baseQuery
+	err := r.db.GetContext(ctx, &total, query, args...)
 	return total, err
+}
+
+// validTextFilter проверяет, что фильтр содержит минимум 3 непробельных символа
+func validTextFilter(s string) bool {
+	count := 0
+	for _, r := range s {
+		if r != ' ' && r != '\n' && r != '\t' {
+			count++
+		}
+	}
+	return count >= 3
 }
