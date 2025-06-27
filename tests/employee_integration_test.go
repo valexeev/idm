@@ -129,7 +129,8 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		// Теперь проверяем в транзакции
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
-		defer func() {
+
+    defer func() {
 			// Обрабатываем ошибку rollback корректно
 			if err := tx.Rollback(); err != nil && err.Error() != "sql: transaction has already been committed or rolled back" {
 				t.Logf("tx.Rollback failed: %v", err)
@@ -182,7 +183,6 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		ctx := context.Background()
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
-
 		now := time.Now()
 
 		// Создаем первого сотрудника
@@ -213,7 +213,6 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		saved1, err := employeeRepo.FindById(ctx, employee1.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "Employee 1", saved1.Name)
-
 		saved2, err := employeeRepo.FindById(ctx, employee2.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "Employee 2", saved2.Name)

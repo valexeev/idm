@@ -64,6 +64,7 @@ func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	if err != nil {
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageSize")
 	}
+
 	textFilter := ctx.Query("textFilter", "")
 	// Формируем запрос с фильтром
 	req := PageRequest{PageNumber: pageNumber, PageSize: pageSize, TextFilter: textFilter}

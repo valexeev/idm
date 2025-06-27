@@ -359,6 +359,7 @@ func (s *StubRepo) Add(ctx context.Context, e *Entity) error {
 	return errors.New("not implemented")
 }
 
+
 func (s *StubRepo) FindAll(_ context.Context) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
@@ -399,6 +400,7 @@ func (s *StubRepo) CountAll(_ context.Context, _ string) (int64, error) {
 
 func (m *MockRepo) CountAll(ctx context.Context, textFilter string) (int64, error) {
 	args := m.Called(ctx, textFilter)
+
 	return args.Get(0).(int64), args.Error(1)
 }
 
