@@ -3,6 +3,7 @@ package employee
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -109,4 +110,20 @@ func (r *Repository) FindByNameTx(ctx context.Context, tx Transaction, name stri
 func (r *Repository) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
 	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
 	return tx.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
+}
+
+// FindPage возвращает сотрудников с учетом пагинации (limit, offset)
+func (r *Repository) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
+	var res []Entity
+	fmt.Printf("[DEBUG] FindPage: limit=%d, offset=%d\n", limit, offset)
+	err := r.db.SelectContext(ctx, &res, "SELECT * FROM employee LIMIT $1 OFFSET $2", limit, offset)
+	fmt.Printf("[DEBUG] FindPage result: %v, err: %v\n", res, err)
+	return res, err
+}
+
+// CountAll возвращает общее количество сотрудников
+func (r *Repository) CountAll(ctx context.Context) (int64, error) {
+	var total int64
+	err := r.db.GetContext(ctx, &total, "SELECT COUNT(*) FROM employee")
+	return total, err
 }

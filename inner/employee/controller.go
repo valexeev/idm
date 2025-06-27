@@ -3,6 +3,7 @@ package employee
 import (
 	"context"
 	"errors"
+	"fmt"
 	"idm/inner/common"
 	"idm/inner/web"
 	"strconv"
@@ -28,6 +29,8 @@ type Svc interface {
 	DeleteById(ctx context.Context, id int64) error                                     // удаление сотрудника по ID
 	DeleteByIds(ctx context.Context, ids []int64) error                                 // удаление сотрудников по списку ID
 	ValidateRequest(request interface{}) error
+
+	FindPage(ctx context.Context, req PageRequest) (PageResponse, error)
 }
 
 // NewController создает новый экземпляр контроллера сотрудников
@@ -42,11 +45,32 @@ func (c *Controller) RegisterRoutes() {
 	// CRUD операции для сотрудников
 	api.Post("/employees", c.CreateEmployee)                            // создание сотрудника
 	api.Post("/employees/transactional", c.CreateEmployeeTransactional) // создание сотрудника в транзакции
-	api.Get("/employees/:id", c.GetEmployee)                            // получение сотрудника по ID
-	api.Get("/employees", c.GetAllEmployees)                            // получение всех сотрудников
-	api.Post("/employees/by-ids", c.GetEmployeesByIds)                  // получение сотрудников по списку ID
-	api.Delete("/employees/:id", c.DeleteEmployee)                      // удаление сотрудника по ID
-	api.Delete("/employees", c.DeleteEmployeesByIds)                    // удаление сотрудников по списку ID
+	api.Get("/employees/page", c.GetEmployeesPage)
+	api.Get("/employees/:id", c.GetEmployee)           // получение сотрудника по ID
+	api.Get("/employees", c.GetAllEmployees)           // получение всех сотрудников
+	api.Post("/employees/by-ids", c.GetEmployeesByIds) // получение сотрудников по списку ID
+	api.Delete("/employees/:id", c.DeleteEmployee)     // удаление сотрудника по ID
+	api.Delete("/employees", c.DeleteEmployeesByIds)   // удаление сотрудников по списку ID
+}
+
+// GetEmployeesPage получает страницу сотрудников
+// GET /api/v1/employees/page?pageNumber=x&pageSize=y
+func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
+	pageNumber, err := strconv.Atoi(ctx.Query("pageNumber", "0"))
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageNumber")
+	}
+	pageSize, err := strconv.Atoi(ctx.Query("pageSize", "20"))
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageSize")
+	}
+	req := PageRequest{PageNumber: pageNumber, PageSize: pageSize}
+	resp, err := c.employeeService.FindPage(context.Background(), req)
+	if err != nil {
+		fmt.Println("ERROR in GetEmployeesPage:", err)
+		return handleError(ctx, err)
+	}
+	return common.OkResponse(ctx, resp)
 }
 
 // handleError централизованная обработка ошибок с соответствующими HTTP статусами

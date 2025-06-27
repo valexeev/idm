@@ -69,7 +69,16 @@ func (f *Fixture) ClearTable(table string) error {
 	if !allowed[table] {
 		return fmt.Errorf("table %s not allowed", table)
 	}
-	query := fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table)
+	
+	var query string
+	switch table {
+	case "employee":
+		query = "TRUNCATE TABLE employee RESTART IDENTITY CASCADE"
+	case "role":
+		query = "TRUNCATE TABLE role RESTART IDENTITY CASCADE"
+	default:
+		return fmt.Errorf("table %s not allowed", table)
+	}
 	_, err := f.db.Exec(query)
 	return err
 }
