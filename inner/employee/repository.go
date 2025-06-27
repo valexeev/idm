@@ -3,7 +3,6 @@ package employee
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -112,7 +111,6 @@ func (r *Repository) AddTx(ctx context.Context, tx Transaction, e *Entity) error
 	query := `INSERT INTO employee (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
 	return tx.QueryRowContext(ctx, query, e.Name, e.CreatedAt, e.UpdatedAt).Scan(&e.Id)
 }
-
 
 // FindPage возвращает сотрудников с учетом пагинации (limit, offset, textFilter)
 func (r *Repository) FindPage(ctx context.Context, limit, offset int, textFilter string) ([]Entity, error) {
