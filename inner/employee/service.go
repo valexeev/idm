@@ -38,8 +38,8 @@ type Repo interface {
 	BeginTransaction(ctx context.Context) (Transaction, error)
 	FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error)
 	AddTx(ctx context.Context, tx Transaction, e *Entity) error
-	FindPage(ctx context.Context, limit, offset int) ([]Entity, error)
-	CountAll(ctx context.Context) (int64, error)
+	FindPage(ctx context.Context, limit, offset int, textFilter string) ([]Entity, error)
+	CountAll(ctx context.Context, textFilter string) (int64, error)
 }
 
 type Validator interface {
@@ -55,11 +55,6 @@ func (svc *Service) ValidateRequest(request interface{}) error {
 	return nil
 }
 
-type PageRequest struct {
-	PageSize   int `validate:"min=1,max=100"`
-	PageNumber int `validate:"min=0"`
-}
-
 type PageResponse struct {
 	Result     []Response `json:"result"`
 	PageSize   int        `json:"page_size"`
@@ -73,11 +68,11 @@ func (svc *Service) FindPage(ctx context.Context, req PageRequest) (PageResponse
 		return PageResponse{}, common.RequestValidationError{Message: err.Error()}
 	}
 	offset := req.PageNumber * req.PageSize
-	entities, err := svc.repo.FindPage(ctx, req.PageSize, offset)
+	entities, err := svc.repo.FindPage(ctx, req.PageSize, offset, req.TextFilter)
 	if err != nil {
 		return PageResponse{}, err
 	}
-	total, err := svc.repo.CountAll(ctx)
+	total, err := svc.repo.CountAll(ctx, req.TextFilter)
 	if err != nil {
 		return PageResponse{}, err
 	}

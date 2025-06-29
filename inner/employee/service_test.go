@@ -78,8 +78,9 @@ func (m *MockRepo) RollbackTransaction(tx *sqlx.Tx) error {
 	return args.Error(0)
 }
 
-func (m *MockRepo) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
-	args := m.Called(ctx, limit, offset)
+// Обновлённая сигнатура FindPage для MockRepo
+func (m *MockRepo) FindPage(ctx context.Context, limit, offset int, textFilter string) ([]Entity, error) {
+	args := m.Called(ctx, limit, offset, textFilter)
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
@@ -299,7 +300,8 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 		_, err := svc.FindPage(context.Background(), req)
 
 		a.Error(err)
-		validationErr, ok := err.(common.RequestValidationError)
+		var validationErr common.RequestValidationError
+		ok := errors.As(err, &validationErr)
 		a.True(ok)
 		a.Contains(validationErr.Message, "pagesize must be at least 1")
 		a.True(repo.AssertNumberOfCalls(t, "FindPage", 0))
@@ -314,7 +316,8 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 		_, err := svc.FindPage(context.Background(), req)
 
 		a.Error(err)
-		validationErr, ok := err.(common.RequestValidationError)
+		var validationErr common.RequestValidationError
+		ok := errors.As(err, &validationErr)
 		a.True(ok)
 		a.Contains(validationErr.Message, "pagesize must be at most 100")
 		a.True(repo.AssertNumberOfCalls(t, "FindPage", 0))
@@ -356,43 +359,48 @@ func (s *StubRepo) Add(ctx context.Context, e *Entity) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) FindAll(ctx context.Context) ([]Entity, error) {
+
+func (s *StubRepo) FindAll(_ context.Context) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) FindByIds(ctx context.Context, ids []int64) ([]Entity, error) {
+func (s *StubRepo) FindByIds(_ context.Context, _ []int64) ([]Entity, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteById(ctx context.Context, id int64) error {
+func (s *StubRepo) DeleteById(_ context.Context, _ int64) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) DeleteByIds(ctx context.Context, ids []int64) error {
+func (s *StubRepo) DeleteByIds(_ context.Context, _ []int64) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) BeginTransaction(ctx context.Context) (Transaction, error) {
+func (s *StubRepo) BeginTransaction(_ context.Context) (Transaction, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *StubRepo) FindByNameTx(ctx context.Context, tx Transaction, name string) (bool, error) {
+func (s *StubRepo) FindByNameTx(_ context.Context, _ Transaction, _ string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
-func (s *StubRepo) AddTx(ctx context.Context, tx Transaction, e *Entity) error {
+func (s *StubRepo) AddTx(_ context.Context, _ Transaction, _ *Entity) error {
 	return errors.New("not implemented")
 }
 
-func (s *StubRepo) FindPage(ctx context.Context, limit, offset int) ([]Entity, error) {
-	return nil, errors.New("not implemented")
+// Обновлённая сигнатура FindPage для StubRepo (если есть)
+func (s *StubRepo) FindPage(_ context.Context, _, _ int, _ string) ([]Entity, error) {
+	return nil, nil
 }
 
-func (s *StubRepo) CountAll(ctx context.Context) (int64, error) {
+// Обновлённая сигнатура CountAll для StubRepo
+func (s *StubRepo) CountAll(_ context.Context, _ string) (int64, error) {
 	return 0, errors.New("not implemented")
 }
-func (m *MockRepo) CountAll(ctx context.Context) (int64, error) {
-	args := m.Called(ctx)
+
+func (m *MockRepo) CountAll(ctx context.Context, textFilter string) (int64, error) {
+	args := m.Called(ctx, textFilter)
+
 	return args.Get(0).(int64), args.Error(1)
 }
 

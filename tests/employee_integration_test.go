@@ -130,7 +130,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
 
-		defer func() {
+    defer func() {
 			// Обрабатываем ошибку rollback корректно
 			if err := tx.Rollback(); err != nil && err.Error() != "sql: transaction has already been committed or rolled back" {
 				t.Logf("tx.Rollback failed: %v", err)
@@ -140,7 +140,6 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		exists, err := employeeRepo.FindByNameTx(ctx, tx, "Existing Employee")
 		assert.NoError(t, err)
 		assert.True(t, exists)
-
 	})
 
 	t.Run("should create employee using AddTx method", func(t *testing.T) {
@@ -339,5 +338,81 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
 		assert.NoError(t, err)
 		assert.Equal(t, 20, wrappedResp.Data.PageSize)
+	})
+
+	// Тесты фильтрации по имени (textFilter)
+	t.Run("should filter employees by name with textFilter", func(t *testing.T) {
+		err := fixture.CleanupDatabase()
+		assert.NoError(t, err)
+		// Подготовим сотрудников с разными именами
+		names := []string{"Alice", "Bob", "Charlie", "David", "Eve", "Alina", "Al"}
+		_, err = fixture.CreateMultipleEmployees(names)
+		assert.NoError(t, err)
+
+		type WrappedPageResponse struct {
+			Success bool                  `json:"success"`
+			Data    employee.PageResponse `json:"data"`
+		}
+		app := setupTestApp(db)
+
+		t.Run("no textFilter param returns all", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20", nil)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			var wrappedResp WrappedPageResponse
+			err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
+			assert.NoError(t, err)
+			assert.Equal(t, len(names), len(wrappedResp.Data.Result))
+		})
+
+		t.Run("empty textFilter returns all", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=", nil)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			var wrappedResp WrappedPageResponse
+			err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
+			assert.NoError(t, err)
+			assert.Equal(t, len(names), len(wrappedResp.Data.Result))
+		})
+
+		t.Run("textFilter only spaces returns all", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=%20%20%20", nil)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			var wrappedResp WrappedPageResponse
+			err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
+			assert.NoError(t, err)
+			assert.Equal(t, len(names), len(wrappedResp.Data.Result))
+		})
+
+		t.Run("textFilter less than 3 chars returns all", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=Al", nil)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			var wrappedResp WrappedPageResponse
+			err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
+			assert.NoError(t, err)
+			assert.Equal(t, len(names), len(wrappedResp.Data.Result))
+		})
+
+		t.Run("textFilter 3+ chars returns filtered", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=Ali", nil)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			var wrappedResp WrappedPageResponse
+			err = json.NewDecoder(resp.Body).Decode(&wrappedResp)
+			assert.NoError(t, err)
+			// Должны быть только Alice и Alina
+			var filtered []string
+			for _, e := range wrappedResp.Data.Result {
+				filtered = append(filtered, e.Name)
+			}
+			assert.ElementsMatch(t, []string{"Alice", "Alina"}, filtered)
+		})
 	})
 }
