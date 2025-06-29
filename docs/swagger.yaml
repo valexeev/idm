@@ -1,0 +1,502 @@
+basePath: /api/v1/
+definitions:
+  common.ResponseExample:
+    properties:
+      data: {}
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  employee.AddEmployeeRequest:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  employee.DeleteByIdsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  employee.FindByIdsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  info.HealthResponse:
+    properties:
+      database:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+  info.InfoResponse:
+    properties:
+      name:
+        type: string
+      version:
+        type: string
+    type: object
+  role.AddRoleRequest:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  role.DeleteByIdsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  role.FindByIdsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+info:
+  contact: {}
+  title: IDM API documentation
+paths:
+  /employees:
+    delete:
+      consumes:
+      - application/json
+      description: Удалить сотрудников по списку идентификаторов
+      parameters:
+      - description: список ID сотрудников для удаления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.DeleteByIdsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Удалить сотрудников по списку ID
+      tags:
+      - employee
+    get:
+      consumes:
+      - application/json
+      description: Получить список всех сотрудников
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить всех сотрудников
+      tags:
+      - employee
+    post:
+      consumes:
+      - application/json
+      description: Create a new employee
+      parameters:
+      - description: create employee request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.AddEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Создать нового сотрудника
+      tags:
+      - employee
+  /employees/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удалить сотрудника по идентификатору
+      parameters:
+      - description: ID сотрудника
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Удалить сотрудника по ID
+      tags:
+      - employee
+    get:
+      consumes:
+      - application/json
+      description: Получить сотрудника по его идентификатору
+      parameters:
+      - description: ID сотрудника
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить сотрудника по ID
+      tags:
+      - employee
+  /employees/by-ids:
+    post:
+      consumes:
+      - application/json
+      description: Получить сотрудников по списку идентификаторов
+      parameters:
+      - description: список ID сотрудников
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.FindByIdsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить сотрудников по списку ID
+      tags:
+      - employee
+  /employees/page:
+    get:
+      consumes:
+      - application/json
+      description: Получить страницу сотрудников с фильтрацией
+      parameters:
+      - description: Номер страницы
+        in: query
+        name: pageNumber
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: pageSize
+        type: integer
+      - description: Фильтр по имени
+        in: query
+        name: textFilter
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить страницу сотрудников
+      tags:
+      - employee
+  /employees/transactional:
+    post:
+      consumes:
+      - application/json
+      description: Создать нового сотрудника в рамках транзакции
+      parameters:
+      - description: create employee transactional request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.AddEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Создать нового сотрудника (транзакция)
+      tags:
+      - employee
+  /internal/health:
+    get:
+      description: Проверяет доступность приложения и базы данных
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Проверка работоспособности приложения
+      tags:
+      - internal
+  /internal/health/detailed:
+    get:
+      description: Возвращает подробную информацию о состоянии приложения и базы данных
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/info.HealthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить подробный статус системы
+      tags:
+      - internal
+  /internal/info:
+    get:
+      description: Возвращает имя и версию приложения
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/info.InfoResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить информацию о приложении
+      tags:
+      - internal
+  /roles:
+    delete:
+      consumes:
+      - application/json
+      description: Удалить роли по списку идентификаторов
+      parameters:
+      - description: список ID ролей для удаления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/role.DeleteByIdsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Удалить роли по списку ID
+      tags:
+      - role
+    get:
+      consumes:
+      - application/json
+      description: Получить список всех ролей
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить все роли
+      tags:
+      - role
+    post:
+      consumes:
+      - application/json
+      description: Создать новую роль
+      parameters:
+      - description: create role request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/role.AddRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Создать новую роль
+      tags:
+      - role
+  /roles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удалить роль по идентификатору
+      parameters:
+      - description: ID роли
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Удалить роль по ID
+      tags:
+      - role
+    get:
+      consumes:
+      - application/json
+      description: Получить роль по идентификатору
+      parameters:
+      - description: ID роли
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить роль по ID
+      tags:
+      - role
+  /roles/by-ids:
+    post:
+      consumes:
+      - application/json
+      description: Получить роли по списку идентификаторов
+      parameters:
+      - description: список ID ролей
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/role.FindByIdsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ResponseExample'
+      summary: Получить роли по списку ID
+      tags:
+      - role
+swagger: "2.0"

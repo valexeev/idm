@@ -54,7 +54,17 @@ func (c *Controller) RegisterRoutes() {
 }
 
 // GetEmployeesPage получает страницу сотрудников
-// GET /api/v1/employees/page?pageNumber=x&pageSize=y
+// @Summary Получить страницу сотрудников
+// @Description Получить страницу сотрудников с фильтрацией
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param pageNumber query int false "Номер страницы"
+// @Param pageSize query int false "Размер страницы"
+// @Param textFilter query string false "Фильтр по имени"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees/page [get]
 func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	pageNumber, err := strconv.Atoi(ctx.Query("pageNumber", "0"))
 	if err != nil {
@@ -97,7 +107,15 @@ func handleError(ctx *fiber.Ctx, err error) error {
 }
 
 // CreateEmployeeTransactional создает нового сотрудника в рамках транзакции
-// POST /api/v1/employees/transactional
+// @Summary Создать нового сотрудника (транзакция)
+// @Description Создать нового сотрудника в рамках транзакции
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param request body employee.AddEmployeeRequest true "create employee transactional request"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees/transactional [post]
 func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 	var req AddEmployeeRequest
 
@@ -127,7 +145,15 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 }
 
 // CreateEmployee создает нового сотрудника (без транзакции)
-// POST /api/v1/employees
+// @Summary Создать нового сотрудника
+// @Description Create a new employee
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param request body employee.AddEmployeeRequest true "create employee request"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees [post]
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 	var req AddEmployeeRequest
 
@@ -162,7 +188,16 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 }
 
 // GetEmployee получает сотрудника по его ID
-// GET /api/v1/employees/:id
+// @Summary Получить сотрудника по ID
+// @Description Получить сотрудника по его идентификатору
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param id path int true "ID сотрудника"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Failure 404 {object} common.ResponseExample
+// @Router /employees/{id} [get]
 func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 	// Извлечение и парсинг ID из параметров маршрута
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
@@ -184,7 +219,14 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 }
 
 // GetAllEmployees получает список всех сотрудников
-// GET /api/v1/employees
+// @Summary Получить всех сотрудников
+// @Description Получить список всех сотрудников
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Success 200 {object} common.ResponseExample
+// @Failure 500 {object} common.ResponseExample
+// @Router /employees [get]
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 	// Получение всех сотрудников через сервис
 	resp, err := c.employeeService.FindAll(ctx.Context())
@@ -200,7 +242,15 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 }
 
 // GetEmployeesByIds получает сотрудников по списку ID
-// POST /api/v1/employees/by-ids
+// @Summary Получить сотрудников по списку ID
+// @Description Получить сотрудников по списку идентификаторов
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param request body employee.FindByIdsRequest true "список ID сотрудников"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees/by-ids [post]
 func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	// Парсинг JSON тела запроса в структуру FindByIdsRequest
 	var req FindByIdsRequest
@@ -230,7 +280,16 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 }
 
 // DeleteEmployee удаляет сотрудника по его ID
-// DELETE /api/v1/employees/:id
+// @Summary Удалить сотрудника по ID
+// @Description Удалить сотрудника по идентификатору
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param id path int true "ID сотрудника"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} common.ResponseExample
+// @Failure 404 {object} common.ResponseExample
+// @Router /employees/{id} [delete]
 func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
 	// Извлечение и парсинг ID из параметров маршрута
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
@@ -254,7 +313,15 @@ func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
 }
 
 // DeleteEmployeesByIds удаляет сотрудников по списку ID
-// DELETE /api/v1/employees
+// @Summary Удалить сотрудников по списку ID
+// @Description Удалить сотрудников по списку идентификаторов
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param request body employee.DeleteByIdsRequest true "список ID сотрудников для удаления"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees [delete]
 func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	// Парсинг JSON тела запроса в структуру DeleteByIdsRequest
 	var req DeleteByIdsRequest

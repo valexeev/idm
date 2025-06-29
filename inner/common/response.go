@@ -8,6 +8,13 @@ type Response[T any] struct {
 	Data    T      `json:"data"`
 }
 
+// ResponseExample используется только для Swagger-документации (OpenAPI)
+type ResponseExample struct {
+	Success bool        `json:"success"`
+	Message string      `json:"error"`
+	Data    interface{} `json:"data"`
+}
+
 func ErrResponse(
 	c *fiber.Ctx,
 	code int,
