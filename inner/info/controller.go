@@ -47,6 +47,13 @@ func (c *Controller) RegisterRoutes() {
 }
 
 // GetInfo получение информации о приложении
+// @Summary Получить информацию о приложении
+// @Description Возвращает имя и версию приложения
+// @Tags internal
+// @Produce json
+// @Success 200 {object} info.InfoResponse
+// @Failure 500 {object} common.ResponseExample
+// @Router /internal/info [get]
 func (c *Controller) GetInfo(ctx *fiber.Ctx) error {
 	if err := ctx.Status(fiber.StatusOK).JSON(&InfoResponse{
 		Name:    c.cfg.AppName,
@@ -58,6 +65,13 @@ func (c *Controller) GetInfo(ctx *fiber.Ctx) error {
 }
 
 // GetHealth проверка работоспособности приложения
+// @Summary Проверка работоспособности приложения
+// @Description Проверяет доступность приложения и базы данных
+// @Tags internal
+// @Produce plain
+// @Success 200 {string} string "OK"
+// @Failure 500 {object} common.ResponseExample
+// @Router /internal/health [get]
 func (c *Controller) GetHealth(ctx *fiber.Ctx) error {
 	// Создаем контекст с таймаутом для проверки БД
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -75,7 +89,13 @@ func (c *Controller) GetHealth(ctx *fiber.Ctx) error {
 }
 
 // GetHealthDetailed возвращает детальную информацию о состоянии системы
-// Можно использовать для более подробной диагностики
+// @Summary Получить подробный статус системы
+// @Description Возвращает подробную информацию о состоянии приложения и базы данных
+// @Tags internal
+// @Produce json
+// @Success 200 {object} info.HealthResponse
+// @Failure 500 {object} common.ResponseExample
+// @Router /internal/health/detailed [get]
 func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) error {
 	// Создаем контекст с таймаутом для проверки БД
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
