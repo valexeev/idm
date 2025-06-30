@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"idm/docs"
 	"idm/inner/common"
 	"idm/inner/common/validator"
@@ -41,8 +42,19 @@ func main() {
 
 	// 5. Запускаем веб-сервер в отдельной горутине
 	go func() {
-		var err = server.App.Listen(":8080")
+		// загружаем сертификаты
+		cer, err := tls.LoadX509KeyPair(cfg.SslSert, cfg.SslKey)
 		if err != nil {
+			logger.Panic("failed certificate loading: %s", zap.Error(err))
+		}
+		// создаём конфигурацию TLS сервера
+		tlsConfig := &tls.Config{Certificates: []tls.Certificate{cer}}
+		// создаём слушателя https соединения
+		ln, err := tls.Listen("tcp", ":8080", tlsConfig)
+		if err != nil {
+			logger.Panic("failed TLS listener creating: %s", zap.Error(err))
+		}
+		if err := server.App.Listener(ln); err != nil {
 			// паникуем через метод логгера
 			logger.Panic("http server error", zap.Error(err))
 		}

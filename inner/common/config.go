@@ -17,6 +17,8 @@ type Config struct {
 	Dsn            string `validate:"required"`
 	AppName        string `validate:"required"`
 	AppVersion     string `validate:"required"`
+	SslSert        string `validate:"required"`
+	SslKey         string `validate:"required"`
 	LogLevel       string
 	LogDevelopMode bool
 }
@@ -33,6 +35,8 @@ func GetConfig(envFile string) Config {
 		Dsn:            os.Getenv("DB_DSN"),
 		AppName:        os.Getenv("APP_NAME"),
 		AppVersion:     os.Getenv("APP_VERSION"),
+		SslSert:        os.Getenv("SSL_SERT"),
+		SslKey:         os.Getenv("SSL_KEY"),
 		LogLevel:       os.Getenv("LOG_LEVEL"),
 		LogDevelopMode: os.Getenv("LOG_DEVELOP_MODE") == "true",
 	}
