@@ -1,11 +1,13 @@
 package common_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"idm/inner/common"
 )
 
@@ -14,6 +16,8 @@ const (
 	dsnEnv        = "DB_DSN"
 	appNameEnv    = "APP_NAME"
 	appVersionEnv = "APP_VERSION"
+	sslCertEnv    = "SSL_SERT"
+	sslKeyEnv     = "SSL_KEY"
 )
 
 // helper: сброс переменных окружения
@@ -22,14 +26,18 @@ func unsetEnv() {
 	os.Unsetenv(dsnEnv)
 	os.Unsetenv(appNameEnv)
 	os.Unsetenv(appVersionEnv)
+	os.Unsetenv(sslCertEnv)
+	os.Unsetenv(sslKeyEnv)
 }
 
 // helper: установка переменных окружения
-func setEnv(driver, dsn, appName, appVersion string) {
+func setEnv(driver, dsn, appName, appVersion, sslCert, sslKey string) {
 	_ = os.Setenv(dbDriverEnv, driver)
 	_ = os.Setenv(dsnEnv, dsn)
 	_ = os.Setenv(appNameEnv, appName)
 	_ = os.Setenv(appVersionEnv, appVersion)
+	_ = os.Setenv(sslCertEnv, sslCert)
+	_ = os.Setenv(sslKeyEnv, sslKey)
 }
 
 // helper: создание временного .env-файла
@@ -53,13 +61,15 @@ func writeTempEnvFile(content string) string {
 
 func Test_GetConfig_OnlyEnvVars(t *testing.T) {
 	unsetEnv()
-	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0")
+	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0", "test-cert", "test-key")
 
 	cfg := common.GetConfig("")
 	require.Equal(t, "pgx", cfg.DbDriverName)
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 	require.Equal(t, "test-app", cfg.AppName)
 	require.Equal(t, "1.0.0", cfg.AppVersion)
+	require.Equal(t, "test-cert", cfg.SslSert)
+	require.Equal(t, "test-key", cfg.SslKey)
 
 	unsetEnv()
 }
@@ -75,10 +85,10 @@ func Test_GetConfig_EmptyEverything(t *testing.T) {
 
 func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 	unsetEnv()
-	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDB_DSN=dotenv_dsn\nAPP_NAME=dotenv_app\nAPP_VERSION=dotenv_version\n")
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDB_DSN=dotenv_dsn\nAPP_NAME=dotenv_app\nAPP_VERSION=dotenv_version\nSSL_SERT=dotenv_cert\nSSL_KEY=dotenv_key\n")
 	defer os.Remove(envFile)
 
-	setEnv("env_driver", "env_dsn", "env_app", "env_version")
+	setEnv("env_driver", "env_dsn", "env_app", "env_version", "env_cert", "env_key")
 
 	cfg := common.GetConfig(envFile)
 
@@ -86,13 +96,15 @@ func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 	require.Equal(t, "env_dsn", cfg.Dsn)
 	require.Equal(t, "env_app", cfg.AppName)
 	require.Equal(t, "env_version", cfg.AppVersion)
+	require.Equal(t, "env_cert", cfg.SslSert)
+	require.Equal(t, "env_key", cfg.SslKey)
 
 	unsetEnv()
 }
 
 func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	unsetEnv()
-	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDB_DSN=postgres://user:pass@localhost/db\nAPP_NAME=test-app\nAPP_VERSION=1.0.0\n")
+	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDB_DSN=postgres://user:pass@localhost/db\nAPP_NAME=test-app\nAPP_VERSION=1.0.0\nSSL_SERT=cert\nSSL_KEY=key\n")
 	defer os.Remove(envFile)
 
 	cfg := common.GetConfig(envFile)
@@ -101,6 +113,8 @@ func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 	require.Equal(t, "test-app", cfg.AppName)
 	require.Equal(t, "1.0.0", cfg.AppVersion)
+	require.Equal(t, "cert", cfg.SslSert)
+	require.Equal(t, "key", cfg.SslKey)
 }
 
 func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
@@ -116,7 +130,7 @@ func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
 
 func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
 	unsetEnv()
-	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0") // Добавлены APP_NAME и APP_VERSION
+	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0", "cert", "key")
 	envFile := writeTempEnvFile("SOME_VAR=123\n")
 	defer os.Remove(envFile)
 
@@ -126,6 +140,80 @@ func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
 	require.Equal(t, "postgres://user:pass@localhost/db", cfg.Dsn)
 	require.Equal(t, "test-app", cfg.AppName)
 	require.Equal(t, "1.0.0", cfg.AppVersion)
+	require.Equal(t, "cert", cfg.SslSert)
+	require.Equal(t, "key", cfg.SslKey)
 
 	unsetEnv()
+}
+
+func Test_ConfigStruct_Validation(t *testing.T) {
+	v := validator.New()
+
+	t.Run("valid config", func(t *testing.T) {
+		cfg := common.Config{
+			DbDriverName: "pgx",
+			Dsn:          "postgres://user:pass@localhost/db",
+			AppName:      "test-app",
+			AppVersion:   "1.0.0",
+			SslSert:      "cert-path",
+			SslKey:       "key-path",
+		}
+		err := v.Struct(cfg)
+		assert.NoError(t, err)
+	})
+
+	t.Run("missing ssl cert", func(t *testing.T) {
+		cfg := common.Config{
+			DbDriverName: "pgx",
+			Dsn:          "postgres://user:pass@localhost/db",
+			AppName:      "test-app",
+			AppVersion:   "1.0.0",
+			SslSert:      "",
+			SslKey:       "key-path",
+		}
+		err := v.Struct(cfg)
+		assert.Error(t, err)
+		var ve validator.ValidationErrors
+		if errors.As(err, &ve) {
+			assert.Equal(t, "SslSert", ve[0].Field())
+			assert.Equal(t, "required", ve[0].Tag())
+		}
+	})
+
+	t.Run("missing ssl key", func(t *testing.T) {
+		cfg := common.Config{
+			DbDriverName: "pgx",
+			Dsn:          "postgres://user:pass@localhost/db",
+			AppName:      "test-app",
+			AppVersion:   "1.0.0",
+			SslSert:      "cert-path",
+			SslKey:       "",
+		}
+		err := v.Struct(cfg)
+		assert.Error(t, err)
+		var ve validator.ValidationErrors
+		if errors.As(err, &ve) {
+			assert.Equal(t, "SslKey", ve[0].Field())
+			assert.Equal(t, "required", ve[0].Tag())
+		}
+	})
+
+	t.Run("missing both ssl fields", func(t *testing.T) {
+		cfg := common.Config{
+			DbDriverName: "pgx",
+			Dsn:          "postgres://user:pass@localhost/db",
+			AppName:      "test-app",
+			AppVersion:   "1.0.0",
+			SslSert:      "",
+			SslKey:       "",
+		}
+		err := v.Struct(cfg)
+		assert.Error(t, err)
+		var ve validator.ValidationErrors
+		if errors.As(err, &ve) {
+			fields := []string{ve[0].Field(), ve[1].Field()}
+			assert.Contains(t, fields, "SslSert")
+			assert.Contains(t, fields, "SslKey")
+		}
+	})
 }
