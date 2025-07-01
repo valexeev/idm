@@ -45,6 +45,16 @@ func (c *Controller) RegisterRoutes() {
 }
 
 // функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/roles"
+// CreateRole создаёт новую роль
+// @Summary Создать новую роль
+// @Description Создать новую роль
+// @Tags role
+// @Accept json
+// @Produce json
+// @Param request body role.AddRoleRequest true "create role request"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /roles [post]
 func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру AddRoleRequest
 	var request AddRoleRequest
@@ -78,6 +88,17 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 }
 
 // функция-хендлер для получения роли по ID
+// GetRole получает роль по ID
+// @Summary Получить роль по ID
+// @Description Получить роль по идентификатору
+// @Tags role
+// @Accept json
+// @Produce json
+// @Param id path int true "ID роли"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Failure 404 {object} common.ResponseExample
+// @Router /roles/{id} [get]
 func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
@@ -106,6 +127,15 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 }
 
 // функция-хендлер для получения всех ролей
+// GetAllRoles получает список всех ролей
+// @Summary Получить все роли
+// @Description Получить список всех ролей
+// @Tags role
+// @Accept json
+// @Produce json
+// @Success 200 {object} common.ResponseExample
+// @Failure 500 {object} common.ResponseExample
+// @Router /roles [get]
 func (c *Controller) GetAllRoles(ctx *fiber.Ctx) error {
 	// вызываем метод FindAll сервиса role.Service
 	responses, err := c.roleService.FindAll(ctx.Context())
@@ -121,6 +151,16 @@ func (c *Controller) GetAllRoles(ctx *fiber.Ctx) error {
 }
 
 // функция-хендлер для получения ролей по списку ID
+// GetRolesByIds получает роли по списку ID
+// @Summary Получить роли по списку ID
+// @Description Получить роли по списку идентификаторов
+// @Tags role
+// @Accept json
+// @Produce json
+// @Param request body role.FindByIdsRequest true "список ID ролей"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /roles/by-ids [post]
 func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру FindByIdsRequest
 	var request FindByIdsRequest
@@ -150,6 +190,16 @@ func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 }
 
 // функция-хендлер для удаления ролей по списку ID
+// DeleteRolesByIds удаляет роли по списку ID
+// @Summary Удалить роли по списку ID
+// @Description Удалить роли по списку идентификаторов
+// @Tags role
+// @Accept json
+// @Produce json
+// @Param request body role.DeleteByIdsRequest true "список ID ролей для удаления"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} common.ResponseExample
+// @Router /roles [delete]
 func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру DeleteByIdsRequest
 	var request DeleteByIdsRequest
@@ -177,6 +227,17 @@ func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 }
 
 // функция-хендлер для удаления роли по ID
+// DeleteRole удаляет роль по ID
+// @Summary Удалить роль по ID
+// @Description Удалить роль по идентификатору
+// @Tags role
+// @Accept json
+// @Produce json
+// @Param id path int true "ID роли"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} common.ResponseExample
+// @Failure 404 {object} common.ResponseExample
+// @Router /roles/{id} [delete]
 func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	// получаем ID из параметра маршрута
 	idParam := ctx.Params("id")
