@@ -3,12 +3,19 @@ package web
 import (
 	"io"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
+}
 
 func TestRecoverMiddleware(t *testing.T) {
 	tests := []struct {

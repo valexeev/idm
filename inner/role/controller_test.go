@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"idm/inner/common"
 	"idm/inner/web"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -90,6 +93,30 @@ func setupTest(t *testing.T) (*fiber.App, *MockRoleService) {
 	return app, mockService
 }
 
+// helper для создания jwt.Token с нужными ролями
+func makeJWTToken(roles []string) *jwt.Token {
+	claims := &web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+	}
+	return &jwt.Token{Claims: claims}
+}
+
+// helper для Fiber-приложения с подменой middleware авторизации
+func setupAppWithAuth(t *testing.T, svc *MockRoleService, roles []string) *fiber.App {
+	app := fiber.New()
+	groupApiV1 := app.Group("/api/v1")
+	server := &web.Server{App: app, GroupApiV1: groupApiV1}
+	controller := NewController(server, svc)
+	// middleware, который кладёт jwt.Token с нужными ролями
+	auth := func(c *fiber.Ctx) error {
+		c.Locals(web.JwtKey, makeJWTToken(roles))
+		return c.Next()
+	}
+	server.GroupApiV1.Use(auth)
+	controller.RegisterRoutes()
+	return app
+}
+
 // createTestRequest создает HTTP-запрос для тестов
 func createTestRequest(t *testing.T, method, url string, body interface{}) *http.Request {
 	t.Helper()
@@ -114,6 +141,11 @@ func parseResponse(t *testing.T, resp *http.Response, target interface{}) {
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
+}
+
+func TestMain(m *testing.M) {
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
 }
 
 func TestCreateRole(t *testing.T) {

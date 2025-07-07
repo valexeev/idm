@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/golang-jwt/jwt/v5"
 	"idm/inner/common"
 	"idm/inner/web"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -122,38 +125,60 @@ func createTestRequest(t *testing.T, method, url string, body interface{}) *http
 // parseResponse обрабатывает HTTP-ответ
 func parseResponse(t *testing.T, resp *http.Response, target interface{}) {
 	t.Helper()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 }
 
+func TestMain(m *testing.M) {
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
+}
+
 func TestCreateEmployee(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+	t.Run("Success with admin role", func(t *testing.T) {
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		request := AddEmployeeRequest{Name: "John Doe"}
 		expected := Response{Id: 1, Name: "John Doe"}
-		mockService.On("Add", mock.Anything, "John Doe").Return(expected, nil)
+		svc.On("Add", mock.Anything, "John Doe").Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 200, resp.StatusCode)
-
 		var result common.Response[Response]
 		parseResponse(t, resp, &result)
-
 		assert.True(t, result.Success)
 		assert.Equal(t, expected, result.Data)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
+	})
+
+	t.Run("Forbidden for non-admin role", func(t *testing.T) {
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{"user"})
+		request := AddEmployeeRequest{Name: "John Doe"}
+
+		req := createTestRequest(t, "POST", "/api/v1/employees", request)
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, 403, resp.StatusCode)
+		var result common.Response[any]
+		parseResponse(t, resp, &result)
+		assert.False(t, result.Success)
+		assert.Contains(t, result.Message, "Permission denied")
 	})
 
 	t.Run("Empty Name", func(t *testing.T) {
-		app, mockService := setupTest(t)
-		mockService.On("Add", mock.Anything, "").Return(
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
+		svc.On("Add", mock.Anything, "").Return(
 			Response{},
 			common.RequestValidationError{Message: "name cannot be empty"},
 		)
@@ -161,7 +186,7 @@ func TestCreateEmployee(t *testing.T) {
 		req := createTestRequest(t, "POST", "/api/v1/employees", AddEmployeeRequest{Name: ""})
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
 
@@ -169,17 +194,18 @@ func TestCreateEmployee(t *testing.T) {
 		parseResponse(t, resp, &result)
 		assert.False(t, result.Success)
 		assert.Contains(t, result.Message, "cannot be empty")
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Invalid JSON", func(t *testing.T) {
-		app, _ := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		req := httptest.NewRequest("POST", "/api/v1/employees", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -187,28 +213,30 @@ func TestCreateEmployee(t *testing.T) {
 
 func TestCreateEmployeeTransactional(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		request := AddEmployeeRequest{Name: "John Transaction"}
 		expected := Response{Id: 2, Name: "John Transaction"}
-		mockService.On("AddTransactional", mock.Anything, request).Return(expected, nil)
+		svc.On("AddTransactional", mock.Anything, request).Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees/transactional", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
 		var result common.Response[Response]
 		parseResponse(t, resp, &result)
 		assert.Equal(t, expected, result.Data)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Transaction Error", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		request := AddEmployeeRequest{Name: "Fail Transaction"}
-		mockService.On("AddTransactional", mock.Anything, request).Return(
+		svc.On("AddTransactional", mock.Anything, request).Return(
 			Response{},
 			common.TransactionError{Message: "transaction failed"},
 		)
@@ -216,35 +244,37 @@ func TestCreateEmployeeTransactional(t *testing.T) {
 		req := createTestRequest(t, "POST", "/api/v1/employees/transactional", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 500, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 }
 
 func TestGetEmployee(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
 		expected := Response{Id: 1, Name: "Test User"}
-		mockService.On("FindById", mock.Anything, int64(1)).Return(expected, nil)
+		svc.On("FindById", mock.Anything, int64(1)).Return(expected, nil)
 
 		req := httptest.NewRequest("GET", "/api/v1/employees/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
 		var result common.Response[Response]
 		parseResponse(t, resp, &result)
 		assert.Equal(t, expected, result.Data)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
-		app, mockService := setupTest(t)
-		mockService.On("FindById", mock.Anything, int64(999)).Return(
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
+		svc.On("FindById", mock.Anything, int64(999)).Return(
 			Response{},
 			common.NotFoundError{Message: "not found"},
 		)
@@ -252,18 +282,19 @@ func TestGetEmployee(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/employees/999", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 404, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		app, _ := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
 		req := httptest.NewRequest("GET", "/api/v1/employees/invalid", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -271,102 +302,108 @@ func TestGetEmployee(t *testing.T) {
 
 func TestGetAllEmployees(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
 		expected := []Response{
 			{Id: 1, Name: "User 1"},
 			{Id: 2, Name: "User 2"},
 		}
-		mockService.On("FindAll", mock.Anything).Return(expected, nil)
+		svc.On("FindAll", mock.Anything).Return(expected, nil)
 
 		req := httptest.NewRequest("GET", "/api/v1/employees", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
 		var result common.Response[[]Response]
 		parseResponse(t, resp, &result)
 		assert.Equal(t, expected, result.Data)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 }
 
 func TestGetEmployeesByIds(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
 		request := FindByIdsRequest{Ids: []int64{1, 2}}
 		expected := []Response{
 			{Id: 1, Name: "User 1"},
 			{Id: 2, Name: "User 2"},
 		}
-		mockService.On("ValidateRequest", request).Return(nil)
-		mockService.On("FindByIds", mock.Anything, []int64{1, 2}).Return(expected, nil)
+		svc.On("ValidateRequest", request).Return(nil)
+		svc.On("FindByIds", mock.Anything, []int64{1, 2}).Return(expected, nil)
 
 		req := createTestRequest(t, "POST", "/api/v1/employees/by-ids", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
 		var result common.Response[[]Response]
 		parseResponse(t, resp, &result)
 		assert.Equal(t, expected, result.Data)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Empty IDs", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin, web.IdmUser})
 		request := FindByIdsRequest{Ids: []int64{}}
-		mockService.On("ValidateRequest", request).Return(
+		svc.On("ValidateRequest", request).Return(
 			common.RequestValidationError{Message: "ids cannot be empty"})
 
 		req := createTestRequest(t, "POST", "/api/v1/employees/by-ids", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 }
 
 func TestDeleteEmployee(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
-		mockService.On("DeleteById", mock.Anything, int64(1)).Return(nil)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
+		svc.On("DeleteById", mock.Anything, int64(1)).Return(nil)
 
 		req := httptest.NewRequest("DELETE", "/api/v1/employees/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 204, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
-		app, mockService := setupTest(t)
-		mockService.On("DeleteById", mock.Anything, int64(999)).Return(
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
+		svc.On("DeleteById", mock.Anything, int64(999)).Return(
 			common.NotFoundError{Message: "employee not found"},
 		)
 
 		req := httptest.NewRequest("DELETE", "/api/v1/employees/999", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 404, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		app, _ := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		req := httptest.NewRequest("DELETE", "/api/v1/employees/invalid", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -374,33 +411,99 @@ func TestDeleteEmployee(t *testing.T) {
 
 func TestDeleteEmployeesByIds(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		request := DeleteByIdsRequest{Ids: []int64{1, 2}}
-		mockService.On("ValidateRequest", request).Return(nil)
-		mockService.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(nil)
+		svc.On("ValidateRequest", request).Return(nil)
+		svc.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(nil)
 
 		req := createTestRequest(t, "DELETE", "/api/v1/employees", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 204, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
 	})
 
 	t.Run("Empty IDs", func(t *testing.T) {
-		app, mockService := setupTest(t)
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
 		request := DeleteByIdsRequest{Ids: []int64{}}
-		mockService.On("ValidateRequest", request).Return(
+		svc.On("ValidateRequest", request).Return(
 			common.RequestValidationError{Message: "ids cannot be empty"})
 
 		req := createTestRequest(t, "DELETE", "/api/v1/employees", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, 400, resp.StatusCode)
-		mockService.AssertExpectations(t)
+		svc.AssertExpectations(t)
+	})
+}
+
+// helper для создания jwt.Token с нужными ролями
+func makeJWTToken(roles []string) *jwt.Token {
+	claims := &web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+	}
+	return &jwt.Token{Claims: claims}
+}
+
+// helper для Fiber-приложения с подменой middleware авторизации
+func setupAppWithAuth(t *testing.T, svc *MockEmployeeService, roles []string) *fiber.App {
+	app := fiber.New()
+	groupApiV1 := app.Group("/api/v1")
+	server := &web.Server{App: app, GroupApiV1: groupApiV1}
+	logger := &common.Logger{Logger: zap.NewNop()}
+	controller := NewController(server, svc, logger)
+	// middleware, который кладёт jwt.Token с нужными ролями
+	auth := func(c *fiber.Ctx) error {
+		c.Locals(web.JwtKey, makeJWTToken(roles))
+		return c.Next()
+	}
+	server.GroupApiV1.Use(auth)
+	controller.RegisterRoutes()
+	return app
+}
+
+func TestCreateEmployee_WithAuth(t *testing.T) {
+	t.Run("Success with admin role", func(t *testing.T) {
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{web.IdmAdmin})
+		request := AddEmployeeRequest{Name: "John Doe"}
+		expected := Response{Id: 1, Name: "John Doe"}
+		svc.On("Add", mock.Anything, "John Doe").Return(expected, nil)
+
+		req := createTestRequest(t, "POST", "/api/v1/employees", request)
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, 200, resp.StatusCode)
+		var result common.Response[Response]
+		parseResponse(t, resp, &result)
+		assert.True(t, result.Success)
+		assert.Equal(t, expected, result.Data)
+		svc.AssertExpectations(t)
+	})
+
+	t.Run("Forbidden for non-admin role", func(t *testing.T) {
+		svc := new(MockEmployeeService)
+		app := setupAppWithAuth(t, svc, []string{"user"})
+		request := AddEmployeeRequest{Name: "John Doe"}
+
+		req := createTestRequest(t, "POST", "/api/v1/employees", request)
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, 403, resp.StatusCode)
+		var result common.Response[any]
+		parseResponse(t, resp, &result)
+		assert.False(t, result.Success)
+		assert.Contains(t, result.Message, "Permission denied")
 	})
 }
 
@@ -512,7 +615,17 @@ func TestIncorrectDataHttpResponses(t *testing.T) {
 
 	for _, test := range errorResponseTests {
 		t.Run(test.name, func(t *testing.T) {
-			app, mockService := setupTest(t)
+			var app *fiber.App
+			var mockService *MockEmployeeService
+			// Для защищённых эндпоинтов используем setupAppWithAuth
+			if (test.method == "POST" && (test.url == "/api/v1/employees" || test.url == "/api/v1/employees/transactional" || test.url == "/api/v1/employees/by-ids")) ||
+				(test.method == "GET" && strings.HasPrefix(test.url, "/api/v1/employees")) ||
+				(test.method == "DELETE" && strings.HasPrefix(test.url, "/api/v1/employees")) {
+				mockService = new(MockEmployeeService)
+				app = setupAppWithAuth(t, mockService, []string{web.IdmAdmin, web.IdmUser})
+			} else {
+				app, mockService = setupTest(t)
+			}
 
 			// Настраиваем мок
 			test.setupMock(mockService)
@@ -577,7 +690,18 @@ func TestValidationDoesNotReachService(t *testing.T) {
 
 	for _, test := range controllerValidationTests {
 		t.Run(test.name, func(t *testing.T) {
-			app, mockService := setupTest(t)
+			var app *fiber.App
+			var mockService *MockEmployeeService
+			// Для защищённых эндпоинтов используем setupAppWithAuth
+			if (test.method == "POST" && strings.HasPrefix(test.url, "/api/v1/employees")) ||
+				(test.method == "GET" && strings.HasPrefix(test.url, "/api/v1/employees")) ||
+				(test.method == "DELETE" && strings.HasPrefix(test.url, "/api/v1/employees")) {
+				mockService = new(MockEmployeeService)
+				app = setupAppWithAuth(t, mockService, []string{web.IdmAdmin, web.IdmUser})
+			} else {
+				app, mockService = setupTest(t)
+			}
+
 			// НЕ настраиваем никаких ожиданий для мока
 
 			var req *http.Request

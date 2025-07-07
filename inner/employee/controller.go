@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"idm/inner/common"
 	"idm/inner/web"
+	"slices"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,7 +17,7 @@ import (
 // Controller структура контроллера для работы с сотрудниками
 type Controller struct {
 	server          *web.Server // экземпляр веб-сервера
-	employeeService Svc         // сервис для работы с сотрудниками
+	employeeService Svc         // сервис ����ля работы с сотрудниками
 	logger          *common.Logger
 }
 
@@ -53,59 +55,6 @@ func (c *Controller) RegisterRoutes() {
 	api.Delete("/employees", c.DeleteEmployeesByIds)   // удаление сотрудников по списку ID
 }
 
-// GetEmployeesPage получает страницу сотрудников
-// @Summary Получить страницу сотрудников
-// @Description Получить страницу сотрудников с фильтрацией
-// @Tags employee
-// @Accept json
-// @Produce json
-// @Param pageNumber query int false "Номер страницы"
-// @Param pageSize query int false "Размер страницы"
-// @Param textFilter query string false "Фильтр по имени"
-// @Success 200 {object} common.ResponseExample
-// @Failure 400 {object} common.ResponseExample
-// @Router /employees/page [get]
-func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
-	pageNumber, err := strconv.Atoi(ctx.Query("pageNumber", "0"))
-	if err != nil {
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageNumber")
-	}
-	pageSize, err := strconv.Atoi(ctx.Query("pageSize", "20"))
-	if err != nil {
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageSize")
-	}
-
-	textFilter := ctx.Query("textFilter", "")
-	// Формируем запрос с фильтром
-	req := PageRequest{PageNumber: pageNumber, PageSize: pageSize, TextFilter: textFilter}
-	resp, err := c.employeeService.FindPage(context.Background(), req)
-	if err != nil {
-		fmt.Println("ERROR in GetEmployeesPage:", err)
-		return handleError(ctx, err)
-	}
-	return common.OkResponse(ctx, resp)
-}
-
-// handleError централизованная обработка ошибок с соответствующими HTTP статусами
-func handleError(ctx *fiber.Ctx, err error) error {
-	switch {
-	// Ошибки валидации и дублирования - 400 Bad Request
-	case errors.As(err, &common.RequestValidationError{}),
-		errors.As(err, &common.AlreadyExistsError{}):
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	// Ошибки транзакций и репозитория - 500 Internal Server Error
-	case errors.As(err, &common.TransactionError{}),
-		errors.As(err, &common.RepositoryError{}):
-		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-	// Ошибки отсутствия данных - 404 Not Found
-	case errors.As(err, &common.NotFoundError{}):
-		return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
-	// Все остальные ошибки - 500 Internal Server Error
-	default:
-		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
-	}
-}
-
 // CreateEmployeeTransactional создает нового сотрудника в рамках транзакции
 // @Summary Создать нового сотрудника (транзакция)
 // @Description Создать нового сотрудника в рамках транзакции
@@ -117,6 +66,14 @@ func handleError(ctx *fiber.Ctx, err error) error {
 // @Failure 400 {object} common.ResponseExample
 // @Router /employees/transactional [post]
 func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	var req AddEmployeeRequest
 
 	// Парсинг JSON
@@ -155,6 +112,14 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 // @Failure 400 {object} common.ResponseExample
 // @Router /employees [post]
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	var req AddEmployeeRequest
 
 	// Парсинг JSON
@@ -199,6 +164,14 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 // @Failure 404 {object} common.ResponseExample
 // @Router /employees/{id} [get]
 func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !(slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) || slices.Contains(claims.RealmAccess.Roles, web.IdmUser)) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	// Извлечение и парсинг ID из параметров маршрута
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
@@ -228,6 +201,14 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 // @Failure 500 {object} common.ResponseExample
 // @Router /employees [get]
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !(slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) || slices.Contains(claims.RealmAccess.Roles, web.IdmUser)) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	// Получение всех сотрудников через сервис
 	resp, err := c.employeeService.FindAll(ctx.Context())
 	if err != nil {
@@ -252,6 +233,14 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 // @Failure 400 {object} common.ResponseExample
 // @Router /employees/by-ids [post]
 func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !(slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) || slices.Contains(claims.RealmAccess.Roles, web.IdmUser)) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	// Парсинг JSON тела запроса в структуру FindByIdsRequest
 	var req FindByIdsRequest
 	if err := ctx.BodyParser(&req); err != nil {
@@ -279,6 +268,67 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	return nil
 }
 
+// GetEmployeesPage получает страницу сотрудников
+// @Summary Получить страницу сотрудников
+// @Description Получить страницу сотрудников с фильтрацией
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param pageNumber query int false "Номер страницы"
+// @Param pageSize query int false "Размер страницы"
+// @Param textFilter query string false "Фильтр по имени"
+// @Success 200 {object} common.ResponseExample
+// @Failure 400 {object} common.ResponseExample
+// @Router /employees/page [get]
+func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !(slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) || slices.Contains(claims.RealmAccess.Roles, web.IdmUser)) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
+	pageNumber, err := strconv.Atoi(ctx.Query("pageNumber", "0"))
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageNumber")
+	}
+	pageSize, err := strconv.Atoi(ctx.Query("pageSize", "20"))
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid pageSize")
+	}
+
+	textFilter := ctx.Query("textFilter", "")
+	// Формируем запрос с фильтром
+	req := PageRequest{PageNumber: pageNumber, PageSize: pageSize, TextFilter: textFilter}
+	resp, err := c.employeeService.FindPage(context.Background(), req)
+	if err != nil {
+		fmt.Println("ERROR in GetEmployeesPage:", err)
+		return handleError(ctx, err)
+	}
+	return common.OkResponse(ctx, resp)
+}
+
+// handleError централи��ованная обработка ошибок с соответствующими HTTP статусами
+func handleError(ctx *fiber.Ctx, err error) error {
+	switch {
+	// Ошибки валидации и дублирования - 400 Bad Request
+	case errors.As(err, &common.RequestValidationError{}),
+		errors.As(err, &common.AlreadyExistsError{}):
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+	// Ошибки транзакций и репозитория - 500 Internal Server Error
+	case errors.As(err, &common.TransactionError{}),
+		errors.As(err, &common.RepositoryError{}):
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	// Ошибки отсутствия данных - 404 Not Found
+	case errors.As(err, &common.NotFoundError{}):
+		return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
+	// Все остальные ошибки - 500 Internal Server Error
+	default:
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	}
+}
+
 // DeleteEmployee удаляет сотрудника по его ID
 // @Summary Удалить сотрудника по ID
 // @Description Удалить сотрудника по идентификатору
@@ -291,6 +341,14 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 // @Failure 404 {object} common.ResponseExample
 // @Router /employees/{id} [delete]
 func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	// Извлечение и парсинг ID из параметров маршрута
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
@@ -323,6 +381,14 @@ func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
 // @Failure 400 {object} common.ResponseExample
 // @Router /employees [delete]
 func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
+	claims, err := getClaims(ctx)
+	if err != nil {
+		return common.ErrResponse(ctx, fiber.StatusUnauthorized, err.Error())
+	}
+	if !slices.Contains(claims.RealmAccess.Roles, web.IdmAdmin) {
+		return common.ErrResponse(ctx, fiber.StatusForbidden, "Permission denied")
+	}
+
 	// Парсинг JSON тела запроса в структуру DeleteByIdsRequest
 	var req DeleteByIdsRequest
 	if err := ctx.BodyParser(&req); err != nil {
@@ -345,4 +411,18 @@ func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	// Возврат статуса 204 No Content при успешном удалении
 	ctx.Status(fiber.StatusNoContent)
 	return nil
+}
+
+// New helper: безопасно извлекает *jwt.Token и *web.IdmClaims, возвращает ошибку если нет токена или claims
+func getClaims(ctx *fiber.Ctx) (*web.IdmClaims, error) {
+	tokenVal := ctx.Locals(web.JwtKey)
+	token, ok := tokenVal.(*jwt.Token)
+	if !ok || token == nil {
+		return nil, errors.New("missing or invalid token")
+	}
+	claims, ok := token.Claims.(*web.IdmClaims)
+	if !ok || claims == nil {
+		return nil, errors.New("invalid token claims")
+	}
+	return claims, nil
 }

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/swagger"
 	"idm/docs"
 	"idm/inner/common"
 	"idm/inner/common/validator"
@@ -106,6 +109,11 @@ func gracefulShutdown(server *web.Server, db *sqlx.DB, logger *common.Logger, sh
 func build(db *sqlx.DB, cfg common.Config, logger *common.Logger) *web.Server {
 	//  1. СОЗДАЁМ ВЕБ-СЕРВЕР (самая большая "матрёшка")
 	var server = web.NewServer()
+	// Регистрируем middleware
+	server.App.Use("/swagger/*", swagger.HandlerDefault)
+	server.App.Use(requestid.New())
+	server.App.Use(recover.New())
+	server.GroupApi.Use(web.AuthMiddleware(logger))
 
 	//  2. СОЗДАЁМ ОБЩИЕ КОМПОНЕНТЫ
 	// Валидатор для проверки входящих данных

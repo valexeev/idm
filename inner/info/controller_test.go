@@ -8,9 +8,11 @@ import (
 	"idm/inner/web"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -70,6 +72,11 @@ func parseResponse(t *testing.T, resp *http.Response, target interface{}) {
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
+}
+
+func TestMain(m *testing.M) {
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
 }
 
 func TestGetInfo(t *testing.T) {

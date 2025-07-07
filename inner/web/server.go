@@ -9,8 +9,13 @@ import (
 // структура веб-сервера
 type Server struct {
 	App           *fiber.App
+	GroupApi      fiber.Router
 	GroupApiV1    fiber.Router
 	GroupInternal fiber.Router
+}
+
+type AuthMiddlewareInterface interface {
+	ProtectWithJwt() func(*fiber.Ctx) error
 }
 
 // функция-конструктор
@@ -28,6 +33,7 @@ func NewServer() *Server {
 
 	return &Server{
 		App:           app,
+		GroupApi:      groupApi,
 		GroupApiV1:    groupApiV1,
 		GroupInternal: groupInternal,
 	}

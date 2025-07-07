@@ -19,6 +19,7 @@ type Config struct {
 	AppVersion     string `validate:"required"`
 	SslSert        string `validate:"required"`
 	SslKey         string `validate:"required"`
+	KeycloakJwkUrl string `validate:"required"`
 	LogLevel       string
 	LogDevelopMode bool
 }
@@ -37,6 +38,7 @@ func GetConfig(envFile string) Config {
 		AppVersion:     os.Getenv("APP_VERSION"),
 		SslSert:        os.Getenv("SSL_SERT"),
 		SslKey:         os.Getenv("SSL_KEY"),
+		KeycloakJwkUrl: os.Getenv("KEYCLOAK_JWK_URL"),
 		LogLevel:       os.Getenv("LOG_LEVEL"),
 		LogDevelopMode: os.Getenv("LOG_DEVELOP_MODE") == "true",
 	}

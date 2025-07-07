@@ -59,7 +59,16 @@ func writeTempEnvFile(content string) string {
 	return tmpFile.Name()
 }
 
+func TestMain(m *testing.M) {
+	_ = os.Setenv("KEYCLOAK_JWK_URL", "http://localhost/jwk")
+	code := m.Run()
+	os.Unsetenv("KEYCLOAK_JWK_URL")
+	os.Exit(code)
+}
+
 func Test_GetConfig_OnlyEnvVars(t *testing.T) {
+	os.Setenv("KEYCLOAK_JWK_URL", "http://localhost:9990/realms/idm/protocol/openid-connect/certs")
+	defer os.Unsetenv("KEYCLOAK_JWK_URL")
 	unsetEnv()
 	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0", "test-cert", "test-key")
 
@@ -85,6 +94,7 @@ func Test_GetConfig_EmptyEverything(t *testing.T) {
 
 func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 	unsetEnv()
+	_ = os.Setenv("KEYCLOAK_JWK_URL", "http://localhost/jwk")
 	envFile := writeTempEnvFile("DB_DRIVER_NAME=dotenv_driver\nDB_DSN=dotenv_dsn\nAPP_NAME=dotenv_app\nAPP_VERSION=dotenv_version\nSSL_SERT=dotenv_cert\nSSL_KEY=dotenv_key\n")
 	defer os.Remove(envFile)
 
@@ -100,10 +110,12 @@ func Test_GetConfig_EnvOverridesDotEnv(t *testing.T) {
 	require.Equal(t, "env_key", cfg.SslKey)
 
 	unsetEnv()
+	os.Unsetenv("KEYCLOAK_JWK_URL")
 }
 
 func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	unsetEnv()
+	_ = os.Setenv("KEYCLOAK_JWK_URL", "http://localhost/jwk")
 	envFile := writeTempEnvFile("DB_DRIVER_NAME=pgx\nDB_DSN=postgres://user:pass@localhost/db\nAPP_NAME=test-app\nAPP_VERSION=1.0.0\nSSL_SERT=cert\nSSL_KEY=key\n")
 	defer os.Remove(envFile)
 
@@ -115,6 +127,9 @@ func Test_GetConfig_OnlyDotEnv(t *testing.T) {
 	require.Equal(t, "1.0.0", cfg.AppVersion)
 	require.Equal(t, "cert", cfg.SslSert)
 	require.Equal(t, "key", cfg.SslKey)
+
+	unsetEnv()
+	os.Unsetenv("KEYCLOAK_JWK_URL")
 }
 
 func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
@@ -130,6 +145,7 @@ func Test_GetConfig_DotEnvMissingVars(t *testing.T) {
 
 func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
 	unsetEnv()
+	_ = os.Setenv("KEYCLOAK_JWK_URL", "http://localhost/jwk")
 	setEnv("pgx", "postgres://user:pass@localhost/db", "test-app", "1.0.0", "cert", "key")
 	envFile := writeTempEnvFile("SOME_VAR=123\n")
 	defer os.Remove(envFile)
@@ -144,6 +160,7 @@ func Test_GetConfig_DotEnvMissingVarsButEnvHasThem(t *testing.T) {
 	require.Equal(t, "key", cfg.SslKey)
 
 	unsetEnv()
+	os.Unsetenv("KEYCLOAK_JWK_URL")
 }
 
 func Test_ConfigStruct_Validation(t *testing.T) {
@@ -151,12 +168,13 @@ func Test_ConfigStruct_Validation(t *testing.T) {
 
 	t.Run("valid config", func(t *testing.T) {
 		cfg := common.Config{
-			DbDriverName: "pgx",
-			Dsn:          "postgres://user:pass@localhost/db",
-			AppName:      "test-app",
-			AppVersion:   "1.0.0",
-			SslSert:      "cert-path",
-			SslKey:       "key-path",
+			DbDriverName:   "pgx",
+			Dsn:            "postgres://user:pass@localhost/db",
+			AppName:        "test-app",
+			AppVersion:     "1.0.0",
+			SslSert:        "cert-path",
+			SslKey:         "key-path",
+			KeycloakJwkUrl: "http://localhost/jwk",
 		}
 		err := v.Struct(cfg)
 		assert.NoError(t, err)
