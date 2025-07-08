@@ -32,3 +32,4 @@ go.work.sum
 main
 
 .github/copilot-instruction.md
+**/.env*
