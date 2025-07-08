@@ -1,23 +1,36 @@
-# Environment variables
+# Секретные переменные и окружение
 .env*
+*.env
 
-# IDE and tool-specific files
+# IDE и инструменты
 .idea/
 .vscode/
 
-# Copilot instructions
-.github/
+# Copilot инструкции
+.github/copilot-instructions.md
 
-# Go build files
+# Системный мусор
+.DS_Store
+Thumbs.db
+
+# Go артефакты сборки
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binaries
 *.test
 
-# Coverage reports
-coverage.out
+# Папки сборки
+bin/
+build/
+out/
 
+# Отчёты покрытия и лог-файлы
+coverage.out
+*.log
+
+# Временные файлы и кэш
+*.swp
+*.tmp
+*.bak
