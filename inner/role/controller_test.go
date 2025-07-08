@@ -101,30 +101,6 @@ func setupTest(t *testing.T) (*fiber.App, *MockRoleService) {
 	return app, mockService
 }
 
-// helper для создания jwt.Token с нужными ролями
-func makeJWTToken(roles []string) *jwt.Token {
-	claims := &web.IdmClaims{
-		RealmAccess: web.RealmAccessClaims{Roles: roles},
-	}
-	return &jwt.Token{Claims: claims}
-}
-
-// helper для Fiber-приложения с подменой middleware авторизации
-func setupAppWithAuth(t *testing.T, svc *MockRoleService, roles []string) *fiber.App {
-	app := fiber.New()
-	groupApiV1 := app.Group("/api/v1")
-	server := &web.Server{App: app, GroupApiV1: groupApiV1}
-	controller := NewController(server, svc)
-	// middleware, который кладёт jwt.Token с нужными ролями
-	auth := func(c *fiber.Ctx) error {
-		c.Locals(web.JwtKey, makeJWTToken(roles))
-		return c.Next()
-	}
-	server.GroupApiV1.Use(auth)
-	controller.RegisterRoutes()
-	return app
-}
-
 // createTestRequest создает HTTP-запрос для тестов
 func createTestRequest(t *testing.T, method, url string, body interface{}) *http.Request {
 	t.Helper()
@@ -1018,7 +994,7 @@ func TestRoleValidationDoesNotReachService(t *testing.T) {
 				}
 			} else {
 				req = httptest.NewRequest(test.method, test.url, nil)
-				// Для тестов с некорректным id тоже нужен токен
+				// Для тестов с некорректным id тоже нужен ток��н
 				token := generateValidToken([]string{web.IdmAdmin})
 				req.Header.Set("Authorization", "Bearer "+token)
 			}
