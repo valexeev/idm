@@ -35,13 +35,15 @@ func NewController(server *web.Server, roleService Svc) *Controller {
 
 // функция для регистрации маршрутов
 func (c *Controller) RegisterRoutes() {
-	// полный маршрут получится "/api/v1/roles"
-	c.server.GroupApiV1.Post("/roles", c.CreateRole)
-	c.server.GroupApiV1.Get("/roles/:id", c.GetRole)
-	c.server.GroupApiV1.Get("/roles", c.GetAllRoles)
-	c.server.GroupApiV1.Post("/roles/by-ids", c.GetRolesByIds)
-	c.server.GroupApiV1.Delete("/roles/:id", c.DeleteRole)
-	c.server.GroupApiV1.Delete("/roles", c.DeleteRolesByIds)
+	// Маршруты для администраторов (создание, изменение, удаление)
+	c.server.GroupApiV1.Post("/roles", web.RequireRoles(web.IdmAdmin), c.CreateRole)
+	c.server.GroupApiV1.Delete("/roles/:id", web.RequireRoles(web.IdmAdmin), c.DeleteRole)
+	c.server.GroupApiV1.Delete("/roles", web.RequireRoles(web.IdmAdmin), c.DeleteRolesByIds)
+
+	// Маршруты для администраторов и пользователей (чтение)
+	c.server.GroupApiV1.Get("/roles/:id", web.RequireRoles(web.IdmAdmin, web.IdmUser), c.GetRole)
+	c.server.GroupApiV1.Get("/roles", web.RequireRoles(web.IdmAdmin, web.IdmUser), c.GetAllRoles)
+	c.server.GroupApiV1.Post("/roles/by-ids", web.RequireRoles(web.IdmAdmin, web.IdmUser), c.GetRolesByIds)
 }
 
 // функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/roles"

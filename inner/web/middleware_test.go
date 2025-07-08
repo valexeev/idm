@@ -48,15 +48,18 @@ func TestRecoverMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Создаем новый сервер для каждого теста
-			server := NewServer()
+			// Создаем простое Fiber приложение без AuthMiddleware для тестирования только recover middleware
+			app := fiber.New()
+
+			// Применяем только middleware, которые мы хотим протестировать
+			RegisterMiddleware(app)
 
 			// Настраиваем роут для теста
-			tt.setupRoute(server.App)
+			tt.setupRoute(app)
 
 			// Создаем тестовый запрос
 			req := httptest.NewRequest("GET", getTestPath(tt.name), nil)
-			resp, err := server.App.Test(req)
+			resp, err := app.Test(req)
 
 			// Проверяем результат
 			require.NoError(t, err)
@@ -93,11 +96,14 @@ func TestRequestIdMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Создаем новый сервер
-			server := NewServer()
+			// Создаем простое Fiber приложение без AuthMiddleware
+			app := fiber.New()
+
+			// Применяем только middleware, которые мы хотим протестировать
+			RegisterMiddleware(app)
 
 			// Добавляем тестовый роут, который возвращает Request ID
-			server.App.Get("/test", func(c *fiber.Ctx) error {
+			app.Get("/test", func(c *fiber.Ctx) error {
 				requestId := c.Locals("requestid")
 				return c.JSON(fiber.Map{
 					"request_id": requestId,
@@ -113,7 +119,7 @@ func TestRequestIdMiddleware(t *testing.T) {
 			}
 
 			// Выполняем запрос
-			resp, err := server.App.Test(req)
+			resp, err := app.Test(req)
 			require.NoError(t, err)
 
 			// Проверяем статус
@@ -147,10 +153,14 @@ func TestRequestIdMiddleware(t *testing.T) {
 
 func TestMiddlewareIntegration(t *testing.T) {
 	t.Run("should handle panic with request ID", func(t *testing.T) {
-		server := NewServer()
+		// Создаем простое Fiber приложение без AuthMiddleware
+		app := fiber.New()
+
+		// Применяем только middleware, которые мы хотим протестировать
+		RegisterMiddleware(app)
 
 		// Роут, который паникует
-		server.App.Get("/panic-with-id", func(c *fiber.Ctx) error {
+		app.Get("/panic-with-id", func(c *fiber.Ctx) error {
 			// Проверяем, что Request ID есть перед паникой
 			requestId := c.Locals("requestid")
 			if requestId == nil {
@@ -163,7 +173,7 @@ func TestMiddlewareIntegration(t *testing.T) {
 		req := httptest.NewRequest("GET", "/panic-with-id", nil)
 		req.Header.Set("X-Request-ID", "panic-test-123")
 
-		resp, err := server.App.Test(req)
+		resp, err := app.Test(req)
 		require.NoError(t, err)
 
 		// Проверяем, что сервер восстановился после паники

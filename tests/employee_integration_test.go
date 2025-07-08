@@ -7,8 +7,10 @@ import (
 	"idm/inner/database"
 	"idm/inner/employee"
 	"idm/inner/role"
+	"idm/inner/web"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +18,8 @@ import (
 )
 
 func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
+	os.Setenv("APP_NAME", "idm-test")
+	os.Setenv("APP_VERSION", "1.0.0")
 	cfg := common.GetConfig(".env.tests")
 
 	db := database.ConnectDbWithCfg(cfg)
@@ -70,7 +74,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		err = tx.Commit()
 		assert.NoError(t, err)
 
-		// Проверяем, что сотрудник действительно создан
+		// Проверяем, что со��рудник действительно создан
 		savedEmployee, err := employeeRepo.FindById(ctx, entity.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "John Transaction", savedEmployee.Name)
@@ -130,7 +134,7 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 		tx, err := employeeRepo.BeginTransaction(ctx)
 		assert.NoError(t, err)
 
-    defer func() {
+		defer func() {
 			// Обрабатываем ошибку rollback корректно
 			if err := tx.Rollback(); err != nil && err.Error() != "sql: transaction has already been committed or rolled back" {
 				t.Logf("tx.Rollback failed: %v", err)
@@ -221,6 +225,10 @@ func TestEmployee_TransactionalMethods_Integration(t *testing.T) {
 
 // Тест пагинации
 func TestEmployee_Pagination_Integration(t *testing.T) {
+	// Устанавливаем тестовый секрет для JWT ПЕРЕД всем остальным
+	os.Setenv("AUTH_TEST_SECRET", "testsecret")
+	defer os.Unsetenv("AUTH_TEST_SECRET")
+
 	cfg := common.GetConfig(".env.tests")
 	db := database.ConnectDbWithCfg(cfg)
 	defer db.Close()
@@ -266,7 +274,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	}
 
 	t.Run("should return 3 employees on first page", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=3", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
@@ -279,7 +291,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	})
 
 	t.Run("should return 2 employees on second page", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=1&pageSize=3", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
@@ -292,7 +308,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	})
 
 	t.Run("should return 0 employees on third page", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=2&pageSize=3", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
@@ -305,7 +325,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	})
 
 	t.Run("should return error for invalid pageSize", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=0", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 400, resp.StatusCode)
@@ -317,7 +341,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	})
 
 	t.Run("should use default PageNumber if not provided", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageSize=3", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
@@ -329,7 +357,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 	})
 
 	t.Run("should use default PageSize if not provided", func(t *testing.T) {
+		// Генерируем валидный JWT токен с ролями для теста
+		token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := app.Test(req, -1)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
@@ -356,7 +388,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		app := setupTestApp(db)
 
 		t.Run("no textFilter param returns all", func(t *testing.T) {
+			// Генерируем валидный JWT токен с ролями для теста
+			token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := app.Test(req, -1)
 			assert.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
@@ -367,7 +403,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		})
 
 		t.Run("empty textFilter returns all", func(t *testing.T) {
+			// Генерируем валидный JWT токен с ролями для теста
+			token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := app.Test(req, -1)
 			assert.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
@@ -378,7 +418,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		})
 
 		t.Run("textFilter only spaces returns all", func(t *testing.T) {
+			// Генерируем валидный JWT токен с ролями для теста
+			token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=%20%20%20", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := app.Test(req, -1)
 			assert.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
@@ -389,7 +433,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		})
 
 		t.Run("textFilter less than 3 chars returns all", func(t *testing.T) {
+			// Генерируем валидный JWT токен с ролями для теста
+			token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=Al", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := app.Test(req, -1)
 			assert.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
@@ -400,7 +448,11 @@ func TestEmployee_Pagination_Integration(t *testing.T) {
 		})
 
 		t.Run("textFilter 3+ chars returns filtered", func(t *testing.T) {
+			// Генерируем валидный JWT токен с ролями для теста
+			token := web.GenerateTestToken([]string{web.IdmUser, web.IdmAdmin})
+
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page?pageNumber=0&pageSize=20&textFilter=Ali", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := app.Test(req, -1)
 			assert.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)

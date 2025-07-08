@@ -17,7 +17,7 @@ import (
 // Controller структура контроллера для работы с сотрудниками
 type Controller struct {
 	server          *web.Server // экземпляр веб-сервера
-	employeeService Svc         // сервис ����ля работы с сотрудниками
+	employeeService Svc         // сервис для работы с сотрудниками
 	logger          *common.Logger
 }
 
@@ -61,9 +61,12 @@ func (c *Controller) RegisterRoutes() {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body employee.AddEmployeeRequest true "create employee transactional request"
 // @Success 200 {object} common.ResponseExample
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Router /employees/transactional [post]
 func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 	claims, err := getClaims(ctx)
@@ -107,9 +110,12 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body employee.AddEmployeeRequest true "create employee request"
 // @Success 200 {object} common.ResponseExample
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Router /employees [post]
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 	claims, err := getClaims(ctx)
@@ -158,9 +164,12 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param id path int true "ID сотрудника"
 // @Success 200 {object} common.ResponseExample
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Failure 404 {object} common.ResponseExample
 // @Router /employees/{id} [get]
 func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
@@ -197,7 +206,10 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Success 200 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Failure 500 {object} common.ResponseExample
 // @Router /employees [get]
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
@@ -228,9 +240,12 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body employee.FindByIdsRequest true "список ID сотрудников"
 // @Success 200 {object} common.ResponseExample
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Router /employees/by-ids [post]
 func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	claims, err := getClaims(ctx)
@@ -274,11 +289,14 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param pageNumber query int false "Номер страницы"
 // @Param pageSize query int false "Размер страницы"
 // @Param textFilter query string false "Фильтр по имени"
 // @Success 200 {object} common.ResponseExample
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Router /employees/page [get]
 func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	claims, err := getClaims(ctx)
@@ -309,7 +327,7 @@ func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, resp)
 }
 
-// handleError централи��ованная обработка ошибок с соответствующими HTTP статусами
+// handleError централизованная обработка ошибок с соответствующими HTTP статусами
 func handleError(ctx *fiber.Ctx, err error) error {
 	switch {
 	// Ошибки валидации и дублирования - 400 Bad Request
@@ -335,9 +353,12 @@ func handleError(ctx *fiber.Ctx, err error) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param id path int true "ID сотрудника"
 // @Success 204 {string} string "No Content"
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Failure 404 {object} common.ResponseExample
 // @Router /employees/{id} [delete]
 func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
@@ -376,9 +397,12 @@ func (c *Controller) DeleteEmployee(ctx *fiber.Ctx) error {
 // @Tags employee
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body employee.DeleteByIdsRequest true "список ID сотрудников для удаления"
 // @Success 204 {string} string "No Content"
 // @Failure 400 {object} common.ResponseExample
+// @Failure 401 {object} common.ResponseExample "Unauthorized"
+// @Failure 403 {object} common.ResponseExample "Forbidden"
 // @Router /employees [delete]
 func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	claims, err := getClaims(ctx)

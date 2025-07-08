@@ -247,7 +247,7 @@ func TestEmployeeService_FindAll(t *testing.T) {
 		// Вызываем тестируемый метод
 		got, err := svc.FindAll(context.Background())
 
-		// Проверяем результа��
+		// Проверяем результат
 		a.Nil(got)
 		a.NotNil(err)
 		a.Contains(err.Error(), "error finding all employees")
@@ -339,7 +339,7 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 	})
 }
 
-// StubRepo - stub-объект репозитория (созданный вручну��)
+// StubRepo - stub-объект репозитория (созданный вручную)
 type StubRepo struct {
 	findByIdFunc func(ctx context.Context, id int64) (Entity, error)
 	addFunc      func(ctx context.Context, e *Entity) error
@@ -422,7 +422,7 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 		v := validator.New()
 		svc := NewService(stub, v)
 
-		// ��ызываем тестируемый метод
+		// Вызываем тестируемый метод
 		got, err := svc.FindById(context.Background(), 42)
 
 		// Проверяем результат
@@ -460,7 +460,7 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 		v := validator.New()
 		svc := NewService(repo, v)
 
-		// Тест��вые данные
+		// Тестовые данные
 		entities := []Entity{
 			{Id: 1, Name: "John Doe", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 			{Id: 2, Name: "Jane Smith", CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -778,7 +778,7 @@ func TestService_AddTransactional(t *testing.T) {
 		a.True(ok, "Should return AlreadyExistsError")
 		a.Contains(alreadyExistsErr.Message, "employee with name 'John Doe' already exists")
 
-		// П��оверяем, что транзакция была откачена
+		// Проверяем, что транзакция была откачена
 		mockTx.AssertCalled(t, "Rollback")
 		// AddTx не должен вызываться, если сотрудник уже существует
 		repo.AssertNotCalled(t, "AddTx")
@@ -887,7 +887,7 @@ func TestService_AddTransactional(t *testing.T) {
 	})
 }
 
-// TestServiceMethodsWithInvalidData - ��есты для проверки обработки некорректных данных в других методах
+// TestServiceMethodsWithInvalidData - тесты для проверки обработки некорректных данных в других методах
 func TestService_MethodsWithInvalidData(t *testing.T) {
 	a := assert.New(t)
 
@@ -970,7 +970,7 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 	})
 }
 
-// TestValidationDoesNotReachDatabase - интеграционные тесты, по��тверждающие, что некорректные данные не достигают базы данных
+// TestValidationDoesNotReachDatabase - интеграционные тесты, подтверждающие, что некорректные данные не достигают базы данных
 func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 	a := assert.New(t)
 
@@ -1162,7 +1162,7 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 		{
 			name: "multiple_validation_errors",
 			testFunc: func(repo *MockRepo, svc *Service) error {
-				// Пустой список ID - должен п��овалить валидацию
+				// Пустой список ID - должен провалить валидацию
 				_, err := svc.FindByIds(context.Background(), []int64{})
 				return err
 			},

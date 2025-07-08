@@ -77,3 +77,34 @@ func parseLogLevel(level string) zapcore.Level {
 		return zapcore.InfoLevel
 	}
 }
+
+// NewTestLogger создает логгер для тестов
+func NewTestLogger() *Logger {
+	var zapEncoderCfg = zapcore.EncoderConfig{
+		TimeKey:        "timestamp",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000000"),
+		EncodeDuration: zapcore.MillisDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	// Конфигурация для тестов - минимальное логирование
+	var zapCfg = zap.Config{
+		Level:            zap.NewAtomicLevelAt(zap.ErrorLevel), // Только ошибки в тестах
+		Development:      true,
+		Encoding:         "console", // Простой формат для тестов
+		EncoderConfig:    zapEncoderCfg,
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stdout"},
+	}
+
+	var logger = zap.Must(zapCfg.Build())
+	return &Logger{logger}
+}
