@@ -111,7 +111,7 @@ func NewTestLogger() *Logger {
 	return &Logger{logger}
 
 // ключ для получения requestId из контекста
-var ridKey = requestid.ConfigDefault.ContextKey.(string)
+var ridKey = requestid.ConfigDefault.ContextKey
 
 // функция логирования с добавлением requestId
 func (l *Logger) DebugCtx(
@@ -123,7 +123,7 @@ func (l *Logger) DebugCtx(
 	if v := ctx.Value(ridKey); v != nil {
 		rid = v.(string)
 	}
-	fields = append(fields, zap.String(ridKey, rid))
+	fields = append(fields, zap.String(ridKey.(string), rid))
 	l.Debug(msg, fields...)
 }
 
@@ -136,7 +136,7 @@ func (l *Logger) InfoCtx(
 	if v := ctx.Value(ridKey); v != nil {
 		rid = v.(string)
 	}
-	fields = append(fields, zap.String(ridKey, rid))
+	fields = append(fields, zap.String(ridKey.(string), rid))
 	l.Info(msg, fields...)
 }
 
@@ -149,7 +149,7 @@ func (l *Logger) ErrorCtx(
 	if v := ctx.Value(ridKey); v != nil {
 		rid = v.(string)
 	}
-	fields = append(fields, zap.String(ridKey, rid))
+	fields = append(fields, zap.String(ridKey.(string), rid))
 	l.Error(msg, fields...)
 }
 
