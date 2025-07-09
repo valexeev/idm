@@ -90,8 +90,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 	t.Run("should return found employee", func(t *testing.T) {
 		// Создаем mock репозитория
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестовые данные
 		entity := Entity{
@@ -116,8 +116,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 
 	t.Run("should return error for invalid id", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестируем валидацию
 		response, err := svc.FindById(context.Background(), 0)
@@ -130,8 +130,8 @@ func TestEmployeeService_FindById(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестовые данные
 		repoErr := errors.New("database error")
@@ -157,8 +157,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should add employee successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Настраиваем mock - при вызове Add модифицируем Entity
 		repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Run(func(args mock.Arguments) {
@@ -178,8 +178,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should return error for empty name", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Вызываем с пустым именем
 		response, err := svc.Add(context.Background(), "")
@@ -193,8 +193,8 @@ func TestEmployeeService_Add(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		repoErr := errors.New("database error")
 		repo.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(repoErr)
@@ -215,8 +215,8 @@ func TestEmployeeService_FindAll(t *testing.T) {
 
 	t.Run("should return all employees", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		// Тестовые данные
 		entities := []Entity{
 			{Id: 1, Name: "John Doe", CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -238,8 +238,8 @@ func TestEmployeeService_FindAll(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		repoErr := errors.New("database error")
 		repo.On("FindAll", mock.Anything).Return([]Entity{}, repoErr)
@@ -260,8 +260,8 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 
 	t.Run("should delete employee successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		repo.On("DeleteById", mock.Anything, int64(1)).Return(nil)
 
 		// Вызываем тестируемый метод
@@ -274,8 +274,8 @@ func TestEmployeeService_DeleteById(t *testing.T) {
 
 	t.Run("should return error for invalid id", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Вызываем с невалидным ID
 		err := svc.DeleteById(context.Background(), 0)
@@ -293,8 +293,8 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 
 	t.Run("should return error if PageSize < 1", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		req := PageRequest{PageSize: 0, PageNumber: 0}
 		_, err := svc.FindPage(context.Background(), req)
@@ -309,8 +309,8 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 
 	t.Run("should return error if PageSize > 100", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		req := PageRequest{PageSize: 101, PageNumber: 0}
 		_, err := svc.FindPage(context.Background(), req)
@@ -325,8 +325,8 @@ func TestEmployeeService_FindPage_Validation(t *testing.T) {
 
 	t.Run("should return error if PageNumber < 0", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		req := PageRequest{PageSize: 10, PageNumber: -1}
 		_, err := svc.FindPage(context.Background(), req)
@@ -358,7 +358,6 @@ func (s *StubRepo) Add(ctx context.Context, e *Entity) error {
 	}
 	return errors.New("not implemented")
 }
-
 
 func (s *StubRepo) FindAll(_ context.Context) ([]Entity, error) {
 	return nil, errors.New("not implemented")
@@ -420,8 +419,8 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 			},
 		}
 
-		validator := validator.New()
-		svc := NewService(stub, validator)
+		v := validator.New()
+		svc := NewService(stub, v)
 
 		// Вызываем тестируемый метод
 		got, err := svc.FindById(context.Background(), 42)
@@ -439,8 +438,8 @@ func TestEmployeeService_FindById_WithStub(t *testing.T) {
 				return Entity{}, errors.New("stub database error")
 			},
 		}
-		validator := validator.New()
-		svc := NewService(stub, validator)
+		v := validator.New()
+		svc := NewService(stub, v)
 
 		// Вызываем тестируемый метод
 		response, err := svc.FindById(context.Background(), 1)
@@ -458,8 +457,8 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 
 	t.Run("should return employees by ids", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестовые данные
 		entities := []Entity{
@@ -483,8 +482,8 @@ func TestEmployeeService_FindByIds(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
@@ -506,8 +505,8 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 
 	t.Run("should delete employees by ids successfully", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		ids := []int64{1, 2}
 		repo.On("DeleteByIds", mock.Anything, ids).Return(nil)
@@ -522,8 +521,8 @@ func TestEmployeeService_DeleteByIds(t *testing.T) {
 
 	t.Run("should return wrapped error from repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		ids := []int64{1, 2}
 		repoErr := errors.New("database error")
@@ -589,8 +588,8 @@ func (m *MockRow) Scan(dest ...interface{}) error {
 func TestService_ValidateRequest(t *testing.T) {
 	a := assert.New(t)
 	repo := new(MockRepo)
-	validator := validator.New()
-	svc := NewService(repo, validator)
+	v := validator.New()
+	svc := NewService(repo, v)
 
 	t.Run("should validate AddEmployeeRequest successfully", func(t *testing.T) {
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -693,8 +692,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should return validation error and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестируем с пустым именем
 		request := AddEmployeeRequest{Name: ""}
@@ -716,8 +715,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should return validation error for short name and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		request := AddEmployeeRequest{Name: "J"}
 
@@ -737,8 +736,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should handle transaction creation error", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
 		transactionErr := errors.New("failed to create transaction")
@@ -761,8 +760,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should rollback transaction when employee already exists", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		mockTx := new(MockTransaction)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -787,8 +786,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should rollback transaction on AddTx error", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		mockTx := new(MockTransaction)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -811,8 +810,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should handle rollback error properly", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		mockTx := new(MockTransaction)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -835,8 +834,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should handle commit error and reset response", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		mockTx := new(MockTransaction)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -861,8 +860,8 @@ func TestService_AddTransactional(t *testing.T) {
 
 	t.Run("should successfully add employee with valid data", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 		mockTx := new(MockTransaction)
 
 		request := AddEmployeeRequest{Name: "John Doe"}
@@ -894,8 +893,8 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 
 	t.Run("FindById should handle validation internally and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тестируем с невалидным ID
 		response, err := svc.FindById(context.Background(), -1)
@@ -912,8 +911,8 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 
 	t.Run("Add should validate name and not call repository on empty name", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		response, err := svc.Add(context.Background(), "")
 
@@ -929,8 +928,8 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 
 	t.Run("Add should validate name length and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Слишком короткое имя
 		response, err := svc.Add(context.Background(), "J")
@@ -946,8 +945,8 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 
 	t.Run("DeleteById should validate ID and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		err := svc.DeleteById(context.Background(), 0)
 
@@ -959,8 +958,8 @@ func TestService_MethodsWithInvalidData(t *testing.T) {
 
 	t.Run("DeleteById should validate negative ID and not call repository", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		err := svc.DeleteById(context.Background(), -5)
 
@@ -1024,8 +1023,8 @@ func TestService_ValidationDoesNotReachDatabase(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := new(MockRepo)
-			validator := validator.New()
-			svc := NewService(repo, validator)
+			v := validator.New()
+			svc := NewService(repo, v)
 
 			err := tc.testFunc(repo, svc)
 
@@ -1049,8 +1048,8 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 
 	t.Run("multiple validation errors should be handled properly", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Создаем запрос с множественными ошибками валидации
 		request := FindByIdsRequest{Ids: []int64{}} // пустой массив
@@ -1066,8 +1065,8 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 
 	t.Run("boundary value testing for name length", func(t *testing.T) {
 		repo := new(MockRepo)
-		validator := validator.New()
-		svc := NewService(repo, validator)
+		v := validator.New()
+		svc := NewService(repo, v)
 
 		// Тест с именем ровно 2 символа
 		validName := "Jo"
@@ -1079,7 +1078,7 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 
 		// Тест с именем 1 символ (invalid)
 		repo2 := new(MockRepo)
-		svc2 := NewService(repo2, validator)
+		svc2 := NewService(repo2, v)
 
 		_, err = svc2.Add(context.Background(), "J")
 		a.NotNil(err)
@@ -1095,7 +1094,7 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 		}
 		repo3 := new(MockRepo)
 		repo3.On("Add", mock.Anything, mock.AnythingOfType("*employee.Entity")).Return(nil).Once()
-		svc3 := NewService(repo3, validator)
+		svc3 := NewService(repo3, v)
 
 		_, err = svc3.Add(context.Background(), maxValidName)
 		require.NoError(t, err)
@@ -1103,7 +1102,7 @@ func TestService_ComplexValidationScenarios(t *testing.T) {
 		// Тест с именем 101 символ (invalid)
 		repo4 := new(MockRepo)
 
-		svc4 := NewService(repo4, validator)
+		svc4 := NewService(repo4, v)
 
 		tooLongName := maxValidName + "a"
 		_, err = svc4.Add(context.Background(), tooLongName)
@@ -1190,8 +1189,8 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 
 			}
 
-			validator := validator.New()
-			svc := NewService(repo, validator)
+			v := validator.New()
+			svc := NewService(repo, v)
 			err := pt.testFunc(repo, svc)
 
 			if pt.shouldCallDB {
@@ -1215,8 +1214,8 @@ func TestBusinessLogicProtectionDetailed(t *testing.T) {
 func TestValidationErrorTypes(t *testing.T) {
 	a := assert.New(t)
 	repo := new(MockRepo)
-	validator := validator.New()
-	svc := NewService(repo, validator)
+	v := validator.New()
+	svc := NewService(repo, v)
 
 	validationErrorTests := []struct {
 		name     string

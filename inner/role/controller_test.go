@@ -6,14 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 	"idm/inner/common"
 	"idm/inner/web"
+
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -74,6 +80,11 @@ func setupTest(t *testing.T) (*fiber.App, *MockRoleService) {
 	}
 
 	mockService := new(MockRoleService)
+
+	// Добавляем middleware авторизации аналогично боевому приложению
+	logger := &common.Logger{Logger: zap.NewNop()}
+	groupApiV1.Use(web.AuthMiddleware(logger))
+
 	controller := NewController(server, mockService)
 
 	// Явная проверка инициализации контроллера
@@ -106,14 +117,43 @@ func createTestRequest(t *testing.T, method, url string, body interface{}) *http
 	return req
 }
 
+// createAuthRequest создает HTTP-запрос с авторизацией для тестов
+func createAuthRequest(t *testing.T, method, url string, body interface{}) *http.Request {
+	t.Helper()
+
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			t.Fatalf("Failed to encode request body: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(method, url, &buf)
+	req.Header.Set("Content-Type", "application/json")
+	token := generateValidToken([]string{web.IdmAdmin})
+	req.Header.Set("Authorization", "Bearer "+token)
+	return req
+}
+
 // parseResponse обрабатывает HTTP-ответ
 func parseResponse(t *testing.T, resp *http.Response, target interface{}) {
 	t.Helper()
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("failed to close response body: %v", err)
+		}
+	}()
 
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
+}
+
+func TestMain(m *testing.M) {
+	os.Setenv("AUTH_TEST_SECRET", "testsecret")
+	defer os.Unsetenv("AUTH_TEST_SECRET")
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
 }
 
 func TestCreateRole(t *testing.T) {
@@ -126,10 +166,14 @@ func TestCreateRole(t *testing.T) {
 		mockService.On("ValidateRequest", request).Return(nil).Once()
 		mockService.On("Add", mock.Anything, "Admin").Return(expected, nil).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -148,10 +192,14 @@ func TestCreateRole(t *testing.T) {
 		mockService.On("ValidateRequest", request).Return(
 			common.RequestValidationError{Message: "role name is invalid"}).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 
@@ -172,10 +220,14 @@ func TestCreateRole(t *testing.T) {
 			common.AlreadyExistsError{Message: "role already exists"},
 		).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 
@@ -196,10 +248,14 @@ func TestCreateRole(t *testing.T) {
 			errors.New("internal server error"),
 		).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -209,12 +265,21 @@ func TestCreateRole(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/v1/roles", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
+		token := generateValidToken([]string{web.IdmAdmin})
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, 400, resp.StatusCode)
+		if resp != nil {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
+			assert.Equal(t, 400, resp.StatusCode)
+		} else {
+			t.Fatal("response is nil")
+		}
 	})
 }
 
@@ -226,10 +291,14 @@ func TestGetRole(t *testing.T) {
 		expected := Response{Id: 1, Name: "Admin"}
 		mockService.On("FindById", mock.Anything, int64(1)).Return(expected, nil).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles/1", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -247,10 +316,14 @@ func TestGetRole(t *testing.T) {
 			common.NotFoundError{Message: "role not found"},
 		).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles/999", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles/999", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 404, resp.StatusCode)
 	})
@@ -264,10 +337,14 @@ func TestGetRole(t *testing.T) {
 			errors.New("database error"),
 		).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles/1", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -275,10 +352,14 @@ func TestGetRole(t *testing.T) {
 	t.Run("Invalid ID", func(t *testing.T) {
 		app, _ := setupTest(t)
 
-		req := httptest.NewRequest("GET", "/api/v1/roles/invalid", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles/invalid", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -295,10 +376,14 @@ func TestGetAllRoles(t *testing.T) {
 		}
 		mockService.On("FindAll", mock.Anything).Return(expected, nil).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -316,10 +401,14 @@ func TestGetAllRoles(t *testing.T) {
 			errors.New("database error"),
 		).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -331,10 +420,14 @@ func TestGetAllRoles(t *testing.T) {
 		expected := []Response{}
 		mockService.On("FindAll", mock.Anything).Return(expected, nil).Once()
 
-		req := httptest.NewRequest("GET", "/api/v1/roles", nil)
+		req := createAuthRequest(t, "GET", "/api/v1/roles", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -357,10 +450,14 @@ func TestGetRolesByIds(t *testing.T) {
 		mockService.On("ValidateRequest", request).Return(nil).Once()
 		mockService.On("FindByIds", mock.Anything, []int64{1, 2}).Return(expected, nil).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles/by-ids", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles/by-ids", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -376,10 +473,14 @@ func TestGetRolesByIds(t *testing.T) {
 		request := FindByIdsRequest{Ids: []int64{}}
 		mockService.On("ValidateRequest", request).Return(fmt.Errorf("ids list cannot be empty")).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles/by-ids", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles/by-ids", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 
@@ -400,10 +501,14 @@ func TestGetRolesByIds(t *testing.T) {
 			errors.New("database error"),
 		).Once()
 
-		req := createTestRequest(t, "POST", "/api/v1/roles/by-ids", request)
+		req := createAuthRequest(t, "POST", "/api/v1/roles/by-ids", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -413,12 +518,21 @@ func TestGetRolesByIds(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/v1/roles/by-ids", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
+		token := generateValidToken([]string{web.IdmAdmin})
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, 400, resp.StatusCode)
+		if resp != nil {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
+			assert.Equal(t, 400, resp.StatusCode)
+		} else {
+			t.Fatal("response is nil")
+		}
 	})
 }
 
@@ -429,10 +543,14 @@ func TestDeleteRole(t *testing.T) {
 
 		mockService.On("DeleteById", mock.Anything, int64(1)).Return(nil).Once()
 
-		req := httptest.NewRequest("DELETE", "/api/v1/roles/1", nil)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 204, resp.StatusCode)
 	})
@@ -445,10 +563,14 @@ func TestDeleteRole(t *testing.T) {
 			common.NotFoundError{Message: "role not found"},
 		).Once()
 
-		req := httptest.NewRequest("DELETE", "/api/v1/roles/999", nil)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles/999", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 404, resp.StatusCode)
 	})
@@ -461,10 +583,14 @@ func TestDeleteRole(t *testing.T) {
 			errors.New("database error"),
 		).Once()
 
-		req := httptest.NewRequest("DELETE", "/api/v1/roles/1", nil)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles/1", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -472,10 +598,14 @@ func TestDeleteRole(t *testing.T) {
 	t.Run("Invalid ID", func(t *testing.T) {
 		app, _ := setupTest(t)
 
-		req := httptest.NewRequest("DELETE", "/api/v1/roles/invalid", nil)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles/invalid", nil)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -490,10 +620,14 @@ func TestDeleteRolesByIds(t *testing.T) {
 		mockService.On("ValidateRequest", request).Return(nil).Once()
 		mockService.On("DeleteByIds", mock.Anything, []int64{1, 2}).Return(nil).Once()
 
-		req := createTestRequest(t, "DELETE", "/api/v1/roles", request)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 204, resp.StatusCode)
 	})
@@ -505,10 +639,14 @@ func TestDeleteRolesByIds(t *testing.T) {
 		request := DeleteByIdsRequest{Ids: []int64{}}
 		mockService.On("ValidateRequest", request).Return(fmt.Errorf("ids list cannot be empty")).Once()
 
-		req := createTestRequest(t, "DELETE", "/api/v1/roles", request)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 400, resp.StatusCode)
 
@@ -528,10 +666,14 @@ func TestDeleteRolesByIds(t *testing.T) {
 			errors.New("database error"),
 		).Once()
 
-		req := createTestRequest(t, "DELETE", "/api/v1/roles", request)
+		req := createAuthRequest(t, "DELETE", "/api/v1/roles", request)
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("failed to close response body: %v", err)
+			}
+		}()
 
 		assert.Equal(t, 500, resp.StatusCode)
 	})
@@ -541,12 +683,21 @@ func TestDeleteRolesByIds(t *testing.T) {
 
 		req := httptest.NewRequest("DELETE", "/api/v1/roles", bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
+		token := generateValidToken([]string{web.IdmAdmin})
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, 400, resp.StatusCode)
+		if resp != nil {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
+			assert.Equal(t, 400, resp.StatusCode)
+		} else {
+			t.Fatal("response is nil")
+		}
 	})
 }
 
@@ -741,15 +892,19 @@ func TestRoleIncorrectDataHttpResponses(t *testing.T) {
 			// Создаем запрос
 			var req *http.Request
 			if test.body != nil {
-				req = createTestRequest(t, test.method, test.url, test.body)
+				req = createAuthRequest(t, test.method, test.url, test.body)
 			} else {
-				req = httptest.NewRequest(test.method, test.url, nil)
+				req = createAuthRequest(t, test.method, test.url, nil)
 			}
 
 			// Выполняем запрос
 			resp, err := app.Test(req)
 			assert.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
 
 			// Проверяем статус
 			assert.Equal(t, test.expectedStatus, resp.StatusCode)
@@ -831,16 +986,26 @@ func TestRoleValidationDoesNotReachService(t *testing.T) {
 				if strBody, ok := test.body.(string); ok {
 					req = httptest.NewRequest(test.method, test.url, strings.NewReader(strBody))
 					req.Header.Set("Content-Type", "application/json")
+					// Добавляем валидный токен для прохождения auth middleware
+					token := generateValidToken([]string{web.IdmAdmin})
+					req.Header.Set("Authorization", "Bearer "+token)
 				} else {
 					req = createTestRequest(t, test.method, test.url, test.body)
 				}
 			} else {
 				req = httptest.NewRequest(test.method, test.url, nil)
+				// Для тестов с некорректным id тоже нужен ток��н
+				token := generateValidToken([]string{web.IdmAdmin})
+				req.Header.Set("Authorization", "Bearer "+token)
 			}
 
 			resp, err := app.Test(req)
 			assert.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
 
 			// Должен быть статус 400
 			assert.Equal(t, 400, resp.StatusCode)
@@ -908,12 +1073,16 @@ func TestRoleValidationWithDifferentErrorTypes(t *testing.T) {
 			test.setupMock(mockService)
 
 			// Создаем запрос
-			req := createTestRequest(t, test.method, test.url, test.body)
+			req := createAuthRequest(t, test.method, test.url, test.body)
 
 			// Выполняем запрос
 			resp, err := app.Test(req)
 			assert.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
 
 			// Проверяем статус
 			assert.Equal(t, test.expectedStatus, resp.StatusCode)
@@ -930,7 +1099,7 @@ func TestRoleValidationWithDifferentErrorTypes(t *testing.T) {
 	}
 }
 
-// TestRoleBoundaryValues - тесты граничных значений
+// TestRoleBoundaryValues - тесты ��раничных значений
 func TestRoleBoundaryValues(t *testing.T) {
 	boundaryTests := []struct {
 		name           string
@@ -1000,21 +1169,191 @@ func TestRoleBoundaryValues(t *testing.T) {
 			// Создаем запрос
 			var req *http.Request
 			if test.body != nil {
-				req = createTestRequest(t, test.method, test.url, test.body)
+				req = createAuthRequest(t, test.method, test.url, test.body)
 			} else {
-				req = httptest.NewRequest(test.method, test.url, nil)
+				req = createAuthRequest(t, test.method, test.url, nil)
 			}
 
 			// Выполняем запрос
 			resp, err := app.Test(req)
 			assert.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
 
 			// Проверяем статус
 			assert.Equal(t, test.expectedStatus, resp.StatusCode)
 
 			// Проверяем выполнение ожиданий мока
 			mockService.AssertExpectations(t)
+		})
+	}
+}
+
+// --- helpers for authz tests ---
+
+// Генерирует валидный JWT-токен с нужными ролями
+func generateValidToken(roles []string) string {
+	claims := &web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, _ := token.SignedString([]byte("testsecret"))
+	return signed
+}
+
+// Генерирует просроченный JWT-токен
+func generateExpiredToken(roles []string) string {
+	claims := &web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, _ := token.SignedString([]byte("testsecret"))
+	return signed
+}
+
+// Генерирует токен с неверной подписью
+func generateTokenWithWrongSignature(roles []string) string {
+	claims := &web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, _ := token.SignedString([]byte("wrongsecret"))
+	return signed
+}
+
+// --- Тесты на аутентификацию и авторизацию для всех эндпоинтов ---
+func TestRole_AuthZ(t *testing.T) {
+	endpoints := []struct {
+		name   string
+		method string
+		url    string
+		body   interface{}
+		roles  []string // роли, которые нужны для доступа
+	}{
+		{"CreateRole", "POST", "/api/v1/roles", AddRoleRequest{Name: "Test"}, []string{web.IdmAdmin}},
+		{"GetRole", "GET", "/api/v1/roles/1", nil, []string{web.IdmAdmin, web.IdmUser}},
+		{"GetAllRoles", "GET", "/api/v1/roles", nil, []string{web.IdmAdmin, web.IdmUser}},
+		{"GetRolesByIds", "POST", "/api/v1/roles/by-ids", FindByIdsRequest{Ids: []int64{1}}, []string{web.IdmAdmin, web.IdmUser}},
+		{"DeleteRole", "DELETE", "/api/v1/roles/1", nil, []string{web.IdmAdmin}},
+		{"DeleteRolesByIds", "DELETE", "/api/v1/roles", DeleteByIdsRequest{Ids: []int64{1}}, []string{web.IdmAdmin}},
+	}
+
+	for _, ep := range endpoints {
+		t.Run(ep.name+"_NoToken", func(t *testing.T) {
+			app, mockService := setupTest(t)
+			// Настроить мок для всех методов, которые могут быть вызваны
+			mockService.On("ValidateRequest", mock.Anything).Return(nil).Maybe()
+			mockService.On("Add", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindById", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindAll", mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("FindByIds", mock.Anything, mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("DeleteById", mock.Anything, mock.Anything).Return(nil).Maybe()
+			mockService.On("DeleteByIds", mock.Anything, mock.Anything).Return(nil).Maybe()
+			var req *http.Request
+			if ep.body != nil {
+				req = createTestRequest(t, ep.method, ep.url, ep.body)
+			} else {
+				req = httptest.NewRequest(ep.method, ep.url, nil)
+			}
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 401, resp.StatusCode)
+		})
+
+		t.Run(ep.name+"_InvalidToken", func(t *testing.T) {
+			app, mockService := setupTest(t)
+			mockService.On("ValidateRequest", mock.Anything).Return(nil).Maybe()
+			mockService.On("Add", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindById", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindAll", mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("FindByIds", mock.Anything, mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("DeleteById", mock.Anything, mock.Anything).Return(nil).Maybe()
+			mockService.On("DeleteByIds", mock.Anything, mock.Anything).Return(nil).Maybe()
+			var req *http.Request
+			if ep.body != nil {
+				req = createTestRequest(t, ep.method, ep.url, ep.body)
+			} else {
+				req = httptest.NewRequest(ep.method, ep.url, nil)
+			}
+			req.Header.Set("Authorization", "Bearer invalid.token.here")
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 401, resp.StatusCode)
+		})
+
+		t.Run(ep.name+"_NoRole", func(t *testing.T) {
+			app, mockService := setupTest(t)
+			// НЕ настраиваем моки, так как до сервиса дойти не должно
+			var req *http.Request
+			if ep.body != nil {
+				req = createTestRequest(t, ep.method, ep.url, ep.body)
+			} else {
+				req = httptest.NewRequest(ep.method, ep.url, nil)
+			}
+			// Токен без нужной роли
+			token := generateValidToken([]string{"SOME_OTHER_ROLE"})
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 403, resp.StatusCode)
+			// Проверяем, что сервис не был вызван
+			assert.Empty(t, mockService.Calls, "Service should not be called for forbidden access")
+		})
+
+		t.Run(ep.name+"_ExpiredToken", func(t *testing.T) {
+			app, mockService := setupTest(t)
+			mockService.On("ValidateRequest", mock.Anything).Return(nil).Maybe()
+			mockService.On("Add", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindById", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindAll", mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("FindByIds", mock.Anything, mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("DeleteById", mock.Anything, mock.Anything).Return(nil).Maybe()
+			mockService.On("DeleteByIds", mock.Anything, mock.Anything).Return(nil).Maybe()
+			var req *http.Request
+			if ep.body != nil {
+				req = createTestRequest(t, ep.method, ep.url, ep.body)
+			} else {
+				req = httptest.NewRequest(ep.method, ep.url, nil)
+			}
+			token := generateExpiredToken(ep.roles)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 401, resp.StatusCode)
+		})
+
+		t.Run(ep.name+"_WrongSignature", func(t *testing.T) {
+			app, mockService := setupTest(t)
+			mockService.On("ValidateRequest", mock.Anything).Return(nil).Maybe()
+			mockService.On("Add", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindById", mock.Anything, mock.Anything).Return(Response{}, nil).Maybe()
+			mockService.On("FindAll", mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("FindByIds", mock.Anything, mock.Anything).Return([]Response{}, nil).Maybe()
+			mockService.On("DeleteById", mock.Anything, mock.Anything).Return(nil).Maybe()
+			mockService.On("DeleteByIds", mock.Anything, mock.Anything).Return(nil).Maybe()
+			var req *http.Request
+			if ep.body != nil {
+				req = createTestRequest(t, ep.method, ep.url, ep.body)
+			} else {
+				req = httptest.NewRequest(ep.method, ep.url, nil)
+			}
+			token := generateTokenWithWrongSignature(ep.roles)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 401, resp.StatusCode)
 		})
 	}
 }

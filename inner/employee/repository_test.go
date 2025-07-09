@@ -17,11 +17,6 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 		// Создаем mock базы данных
 		db, mock, err := sqlmock.New()
 		a.NoError(err)
-		defer db.Close()
-
-		sqlxDB := sqlx.NewDb(db, "sqlmock")
-		repo := NewRepository(sqlxDB)
-		ctx := context.Background()
 
 		// Настраиваем mock для начала транзакции
 		mock.ExpectBegin()
@@ -38,6 +33,17 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 
 		// Настраиваем mock для коммита транзакции
 		mock.ExpectCommit()
+		mock.ExpectClose()
+
+		// Закрытие mock базы данных
+		defer func() {
+			err := db.Close()
+			a.NoError(err)
+		}()
+
+		sqlxDB := sqlx.NewDb(db, "sqlmock")
+		repo := NewRepository(sqlxDB)
+		ctx := context.Background()
 
 		// Начинаем транзакцию
 		tx, err := repo.BeginTransaction(ctx)
@@ -65,6 +71,9 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 		err = tx.Commit()
 		a.NoError(err)
 
+		err = db.Close()
+		a.NoError(err)
+
 		// Проверяем, что все ожидания выполнены
 		a.NoError(mock.ExpectationsWereMet())
 	})
@@ -72,11 +81,6 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 	t.Run("should find existing employee by name in transaction", func(t *testing.T) {
 		db, mock, err := sqlmock.New()
 		a.NoError(err)
-		defer db.Close()
-
-		sqlxDB := sqlx.NewDb(db, "sqlmock")
-		repo := NewRepository(sqlxDB)
-		ctx := context.Background()
 
 		// Настраиваем mock для начала транзакции
 		mock.ExpectBegin()
@@ -88,6 +92,14 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 
 		// Настраиваем mock для отката транзакции
 		mock.ExpectRollback()
+		mock.ExpectClose()
+
+		// Закрытие mock базы данных
+		defer db.Close()
+
+		sqlxDB := sqlx.NewDb(db, "sqlmock")
+		repo := NewRepository(sqlxDB)
+		ctx := context.Background()
 
 		// Начинаем транзакцию
 		tx, err := repo.BeginTransaction(ctx)
@@ -100,6 +112,9 @@ func TestRepository_TransactionalMethods(t *testing.T) {
 
 		// Откатываем транзакцию
 		err = tx.Rollback()
+		a.NoError(err)
+
+		err = db.Close()
 		a.NoError(err)
 
 		// Проверяем, что все ожидания выполнены

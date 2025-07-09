@@ -6,8 +6,10 @@ require (
 	github.com/78bits/go-sqlmock-sqlx v1.5.4
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/gofiber/contrib/fiberzap/v2 v2.1.6
+	github.com/gofiber/contrib/jwt v1.1.2
 	github.com/gofiber/fiber/v2 v2.52.8
 	github.com/gofiber/swagger v1.1.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
@@ -18,6 +20,7 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
+	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect

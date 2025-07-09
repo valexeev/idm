@@ -8,9 +8,11 @@ import (
 	"idm/inner/web"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -31,8 +33,11 @@ func (m *MockDatabase) PingContext(ctx context.Context) error {
 func setupTest(t *testing.T) (*fiber.App, *MockDatabase) {
 	t.Helper()
 
+	// Создаем тестовый логгер
+	logger := common.NewTestLogger()
+
 	// Используем конструктор веб-сервера из вашего кода
-	server := web.NewServer()
+	server := web.NewServer(logger)
 
 	// Создаем мок базы данных
 	mockDB := new(MockDatabase)
@@ -70,6 +75,11 @@ func parseResponse(t *testing.T, resp *http.Response, target interface{}) {
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
+}
+
+func TestMain(m *testing.M) {
+	_ = godotenv.Load(".env.tests")
+	os.Exit(m.Run())
 }
 
 func TestGetInfo(t *testing.T) {
@@ -129,38 +139,12 @@ func TestGetHealth(t *testing.T) {
 		assert.NoError(t, err)
 		defer resp.Body.Close()
 
-		// Отладочная информация
-		if resp.StatusCode != 500 {
-			t.Logf("Expected status 500, got %d", resp.StatusCode)
-
-			// Читаем тело ответа для отладки
-			body := make([]byte, 1024)
-			n, _ := resp.Body.Read(body)
-			t.Logf("Response body: %s", string(body[:n]))
-
-			// Сбрасываем позицию в теле ответа
-			resp.Body.Close()
-			req2 := httptest.NewRequest("GET", "/internal/health", nil)
-			resp, _ = app2.Test(req2)
-		}
-
 		assert.Equal(t, 500, resp.StatusCode)
 
 		// Проверяем, что ответ содержит сообщение об ошибке
 		var errorResponse common.Response[any]
 		err = json.NewDecoder(resp.Body).Decode(&errorResponse)
-		if err != nil {
-			// Если не удается декодировать как JSON, читаем как строку
-			resp.Body.Close()
-			req3 := httptest.NewRequest("GET", "/internal/health", nil)
-			resp3, _ := app2.Test(req3)
-			defer resp3.Body.Close()
-
-			body := make([]byte, 1024)
-			n, _ := resp3.Body.Read(body)
-			t.Logf("Raw response: %s", string(body[:n]))
-			t.Fatalf("Failed to decode JSON response: %v", err)
-		}
+		assert.NoError(t, err, "Should be able to decode JSON response")
 
 		assert.False(t, errorResponse.Success)
 		assert.Contains(t, errorResponse.Message, "Database connection failed")
@@ -171,7 +155,8 @@ func TestGetHealth(t *testing.T) {
 
 func TestGetHealthDetailed(t *testing.T) {
 	// Отдельный setup для детального health check
-	server := web.NewServer()
+	logger := common.NewTestLogger()
+	server := web.NewServer(logger)
 	mockDB := new(MockDatabase)
 	cfg := common.Config{
 		DbDriverName: "postgres",
@@ -209,7 +194,8 @@ func TestGetHealthDetailed(t *testing.T) {
 	t.Run("Failure - Database Unavailable", func(t *testing.T) {
 		// Создаем новый мок для этого теста
 		mockDB2 := new(MockDatabase)
-		server2 := web.NewServer()
+		logger2 := common.NewTestLogger()
+		server2 := web.NewServer(logger2)
 		controller2 := NewController(server2, cfg, mockDB2)
 		controller2.RegisterRoutes()
 		server2.GroupInternal.Get("/health/detailed", controller2.GetHealthDetailed)
