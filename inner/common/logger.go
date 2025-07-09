@@ -109,9 +109,7 @@ func NewTestLogger() *Logger {
 
 	var logger = zap.Must(zapCfg.Build())
 	return &Logger{logger}
-
-// ключ для получения requestId из контекста
-var ridKey = requestid.ConfigDefault.ContextKey
+}
 
 // функция логирования с добавлением requestId
 func (l *Logger) DebugCtx(
@@ -120,10 +118,12 @@ func (l *Logger) DebugCtx(
 	fields ...zap.Field,
 ) {
 	var rid string
-	if v := ctx.Value(ridKey); v != nil {
-		rid = v.(string)
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
 	}
-	fields = append(fields, zap.String(ridKey.(string), rid))
+	fields = append(fields, zap.String("requestid", rid))
 	l.Debug(msg, fields...)
 }
 
@@ -133,10 +133,12 @@ func (l *Logger) InfoCtx(
 	fields ...zap.Field,
 ) {
 	var rid string
-	if v := ctx.Value(ridKey); v != nil {
-		rid = v.(string)
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
 	}
-	fields = append(fields, zap.String(ridKey.(string), rid))
+	fields = append(fields, zap.String("requestid", rid))
 	l.Info(msg, fields...)
 }
 
@@ -146,10 +148,11 @@ func (l *Logger) ErrorCtx(
 	fields ...zap.Field,
 ) {
 	var rid string
-	if v := ctx.Value(ridKey); v != nil {
-		rid = v.(string)
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
 	}
-	fields = append(fields, zap.String(ridKey.(string), rid))
+	fields = append(fields, zap.String("requestid", rid))
 	l.Error(msg, fields...)
 }
-
