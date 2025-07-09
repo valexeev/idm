@@ -109,7 +109,6 @@ func NewTestLogger() *Logger {
 
 	var logger = zap.Must(zapCfg.Build())
 	return &Logger{logger}
-}
 
 // ключ для получения requestId из контекста
 var ridKey = requestid.ConfigDefault.ContextKey.(string)
@@ -153,3 +152,4 @@ func (l *Logger) ErrorCtx(
 	fields = append(fields, zap.String(ridKey, rid))
 	l.Error(msg, fields...)
 }
+

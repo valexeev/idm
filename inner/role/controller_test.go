@@ -87,6 +87,7 @@ func setupTest(t *testing.T) (*fiber.App, *MockRoleService) {
 
 	controller := NewController(server, mockService, logger)
 
+
 	// Явная проверка инициализации контроллера
 	if controller == nil {
 		t.Fatal("Controller is nil")
