@@ -81,23 +81,23 @@ func (c *Controller) CreateEmployeeTransactional(ctx *fiber.Ctx) error {
 
 	// Парсинг JSON
 	if err := ctx.BodyParser(&req); err != nil {
-		c.logger.Error("create employee transactional: invalid JSON", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee transactional: invalid JSON", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// Логируем тело запроса
-	c.logger.Debug("create employee transactional: received request", zap.Any("request", req))
+	c.logger.DebugCtx(ctx.Context(), "create employee transactional: received request", zap.Any("request", req))
 
 	// Вызов сервиса
 	resp, err := c.employeeService.AddTransactional(ctx.Context(), req)
 	if err != nil {
-		c.logger.Error("create employee transactional: failed to add employee", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee transactional: failed to add employee", zap.Error(err))
 		return handleError(ctx, err)
 	}
 
 	// Ответ
 	if err := common.OkResponse(ctx, resp); err != nil {
-		c.logger.Error("create employee transactional: failed to return response", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee transactional: failed to return response", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
 	}
 
@@ -130,17 +130,17 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 
 	// Парсинг JSON
 	if err := ctx.BodyParser(&req); err != nil {
-		c.logger.Error("create employee: invalid JSON", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee: invalid JSON", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// Логируем тело запроса
-	c.logger.Debug("create employee: received request", zap.Any("request", req))
+	c.logger.DebugCtx(ctx.Context(), "create employee: received request", zap.Any("request", req))
 
 	// Вызов сервиса
 	resp, err := c.employeeService.Add(ctx.Context(), req.Name)
 	if err != nil {
-		c.logger.Error("create employee: failed to add employee", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee: failed to add employee", zap.Error(err))
 
 		if errors.As(err, &common.RequestValidationError{}) {
 			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
@@ -151,7 +151,7 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 
 	// Ответ
 	if err := common.OkResponse(ctx, resp); err != nil {
-		c.logger.Error("create employee: failed to return response", zap.Error(err))
+		c.logger.ErrorCtx(ctx.Context(), "create employee: failed to return response", zap.Error(err))
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created employee")
 	}
 

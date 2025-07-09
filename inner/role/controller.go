@@ -13,6 +13,7 @@ import (
 type Controller struct {
 	server      *web.Server
 	roleService Svc
+	logger      *common.Logger
 }
 
 // интерфейс сервиса role.Service
@@ -26,10 +27,11 @@ type Svc interface {
 	ValidateRequest(request any) error
 }
 
-func NewController(server *web.Server, roleService Svc) *Controller {
+func NewController(server *web.Server, roleService Svc, logger *common.Logger) *Controller {
 	return &Controller{
 		server:      server,
 		roleService: roleService,
+		logger:      logger,
 	}
 }
 
@@ -61,9 +63,11 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру AddRoleRequest
 	var request AddRoleRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "create role: invalid JSON")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 	if err := c.roleService.ValidateRequest(request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "create role: validation error")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
@@ -74,15 +78,18 @@ func (c *Controller) CreateRole(ctx *fiber.Ctx) error {
 		// если сервис возвращает ошибку RequestValidationError или AlreadyExistsError,
 		// то мы возвращаем ответ с кодом 400 (BadRequest)
 		case errors.As(err, &common.RequestValidationError{}) || errors.As(err, &common.AlreadyExistsError{}):
+			c.logger.ErrorCtx(ctx.Context(), "create role: validation or already exists error")
 			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		// если сервис возвращает другую ошибку, то мы возвращаем ответ с кодом 500 (InternalServerError)
 		default:
+			c.logger.ErrorCtx(ctx.Context(), "create role: internal error")
 			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
 	// функция OkResponse() формирует и направляет ответ в случае успеха
 	if err = common.OkResponse(ctx, response); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "create role: error returning created role")
 		// функция ErrorResponse() формирует и направляет ответ в случае ошибки
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning created role")
 	}
@@ -106,6 +113,7 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil || id <= 0 {
+		c.logger.ErrorCtx(ctx.Context(), "get role: invalid id")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
@@ -114,15 +122,19 @@ func (c *Controller) GetRole(ctx *fiber.Ctx) error {
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
+			c.logger.ErrorCtx(ctx.Context(), "get role: not found")
 			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
 		case errors.As(err, &common.RequestValidationError{}):
+			c.logger.ErrorCtx(ctx.Context(), "get role: validation error")
 			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		default:
+			c.logger.ErrorCtx(ctx.Context(), "get role: internal error")
 			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
 	if err = common.OkResponse(ctx, response); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get role: error returning role")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning role")
 	}
 	return nil
@@ -142,11 +154,13 @@ func (c *Controller) GetAllRoles(ctx *fiber.Ctx) error {
 	// вызываем метод FindAll сервиса role.Service
 	responses, err := c.roleService.FindAll(ctx.Context())
 	if err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get all roles: internal error")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
 	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, responses); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get all roles: error returning roles")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
 	}
 	return nil
@@ -167,25 +181,30 @@ func (c *Controller) GetRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру FindByIdsRequest
 	var request FindByIdsRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get roles by ids: invalid JSON")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 	if err := c.roleService.ValidateRequest(request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get roles by ids: validation error")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
+		c.logger.ErrorCtx(ctx.Context(), "get roles by ids: empty ids")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
 	}
 
 	// вызываем метод FindByIds сервиса role.Service
 	responses, err := c.roleService.FindByIds(ctx.Context(), request.Ids)
 	if err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get roles by ids: internal error")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
 	// возвращаем успешный ответ
 	if err = common.OkResponse(ctx, responses); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "get roles by ids: error returning roles")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning roles")
 	}
 	return nil
@@ -206,20 +225,24 @@ func (c *Controller) DeleteRolesByIds(ctx *fiber.Ctx) error {
 	// анмаршалим JSON body запроса в структуру DeleteByIdsRequest
 	var request DeleteByIdsRequest
 	if err := ctx.BodyParser(&request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "delete roles by ids: invalid JSON")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 	if err := c.roleService.ValidateRequest(request); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "delete roles by ids: validation error")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
 	// валидация запроса
 	if len(request.Ids) == 0 {
+		c.logger.ErrorCtx(ctx.Context(), "delete roles by ids: empty ids")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "ids list cannot be empty")
 	}
 
 	// вызываем метод DeleteByIds сервиса role.Service
 	err := c.roleService.DeleteByIds(ctx.Context(), request.Ids)
 	if err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "delete roles by ids: internal error")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 
@@ -245,6 +268,7 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil || id <= 0 {
+		c.logger.ErrorCtx(ctx.Context(), "delete role: invalid id")
 		return common.ErrResponse(ctx, fiber.StatusBadRequest, "invalid role id")
 	}
 
@@ -253,10 +277,13 @@ func (c *Controller) DeleteRole(ctx *fiber.Ctx) error {
 	if err != nil {
 		switch {
 		case errors.As(err, &common.NotFoundError{}):
+			c.logger.ErrorCtx(ctx.Context(), "delete role: not found")
 			return common.ErrResponse(ctx, fiber.StatusNotFound, err.Error())
 		case errors.As(err, &common.RequestValidationError{}):
+			c.logger.ErrorCtx(ctx.Context(), "delete role: validation error")
 			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
 		default:
+			c.logger.ErrorCtx(ctx.Context(), "delete role: internal error")
 			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 		}
 	}
