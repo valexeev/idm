@@ -51,7 +51,7 @@ func setupTest(t *testing.T) (*fiber.App, *MockDatabase) {
 	}
 
 	// Создаем контроллер используя ваш конструктор
-	controller := NewController(server, cfg, mockDB)
+	controller := NewController(server, cfg, mockDB, logger)
 
 	// Явная проверка инициализации контроллера
 	if controller == nil {
@@ -165,7 +165,7 @@ func TestGetHealthDetailed(t *testing.T) {
 		AppVersion:   "1.0.0",
 	}
 
-	controller := NewController(server, cfg, mockDB)
+	controller := NewController(server, cfg, mockDB, logger)
 	controller.RegisterRoutes()
 
 	// Регистрируем дополнительный роут для детального health check
@@ -196,7 +196,7 @@ func TestGetHealthDetailed(t *testing.T) {
 		mockDB2 := new(MockDatabase)
 		logger2 := common.NewTestLogger()
 		server2 := web.NewServer(logger2)
-		controller2 := NewController(server2, cfg, mockDB2)
+		controller2 := NewController(server2, cfg, mockDB2, logger2)
 		controller2.RegisterRoutes()
 		server2.GroupInternal.Get("/health/detailed", controller2.GetHealthDetailed)
 

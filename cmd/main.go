@@ -140,17 +140,15 @@ func build(db *sqlx.DB, cfg common.Config, logger *common.Logger) *web.Server {
 	// 4.2 Создаём сервис, передавая в репозиторий
 	var roleService = role.NewService(roleRepo, vld)
 
-	// 4.3 Создаём контроллер, передавая в него сервер и сервис
-	// Если в roleController тоже нужен логгер, то добавьте его в NewController
-	var roleController = role.NewController(server, roleService)
+	// 4.3 Создаём контроллер, передавая в него сервер, сервис и логгер
+	var roleController = role.NewController(server, roleService, logger)
 
 	// 4.4 Регистрируем маршруты контроллера
 	roleController.RegisterRoutes()
 
 	// 5. СБОРКА МОДУЛЯ INFO (информация о приложении)
-	// 5.1 Создаём контроллер, передавая сервер, конфиг и БД напрямую
-	// Если в infoController тоже нужен логгер, то добавьте его в NewController
-	var infoController = info.NewController(server, cfg, db)
+	// 5.1 Создаём контроллер, передавая сервер, конфиг, БД и логгер
+	var infoController = info.NewController(server, cfg, db, logger)
 
 	// 5.2 Регистрируем маршруты контроллера
 	infoController.RegisterRoutes()

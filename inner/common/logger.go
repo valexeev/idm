@@ -1,8 +1,10 @@
 package common
 
 import (
+	"context"
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/fiber/v2/log"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -107,4 +109,50 @@ func NewTestLogger() *Logger {
 
 	var logger = zap.Must(zapCfg.Build())
 	return &Logger{logger}
+}
+
+// функция логирования с добавлением requestId
+func (l *Logger) DebugCtx(
+	ctx context.Context,
+	msg string,
+	fields ...zap.Field,
+) {
+	var rid string
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
+	}
+	fields = append(fields, zap.String("requestid", rid))
+	l.Debug(msg, fields...)
+}
+
+func (l *Logger) InfoCtx(
+	ctx context.Context,
+	msg string,
+	fields ...zap.Field,
+) {
+	var rid string
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
+	}
+	fields = append(fields, zap.String("requestid", rid))
+	l.Info(msg, fields...)
+}
+
+func (l *Logger) ErrorCtx(
+	ctx context.Context,
+	msg string,
+	fields ...zap.Field,
+) {
+	var rid string
+	if v := ctx.Value(requestid.ConfigDefault.ContextKey); v != nil {
+		if ridStr, ok := v.(string); ok {
+			rid = ridStr
+		}
+	}
+	fields = append(fields, zap.String("requestid", rid))
+	l.Error(msg, fields...)
 }

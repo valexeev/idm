@@ -85,7 +85,8 @@ func setupTest(t *testing.T) (*fiber.App, *MockRoleService) {
 	logger := &common.Logger{Logger: zap.NewNop()}
 	groupApiV1.Use(web.AuthMiddleware(logger))
 
-	controller := NewController(server, mockService)
+	controller := NewController(server, mockService, logger)
+
 
 	// Явная проверка инициализации контроллера
 	if controller == nil {

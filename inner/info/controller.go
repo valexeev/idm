@@ -18,13 +18,15 @@ type Controller struct {
 	server *web.Server
 	cfg    common.Config
 	db     Database // используем интерфейс вместо конкретного типа
+	logger *common.Logger
 }
 
-func NewController(server *web.Server, cfg common.Config, database Database) *Controller {
+func NewController(server *web.Server, cfg common.Config, database Database, logger *common.Logger) *Controller {
 	return &Controller{
 		server: server,
 		cfg:    cfg,
 		db:     database,
+		logger: logger,
 	}
 }
 
@@ -59,6 +61,7 @@ func (c *Controller) GetInfo(ctx *fiber.Ctx) error {
 		Name:    c.cfg.AppName,
 		Version: c.cfg.AppVersion,
 	}); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "error returning info")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning info")
 	}
 	return nil
@@ -79,6 +82,7 @@ func (c *Controller) GetHealth(ctx *fiber.Ctx) error {
 
 	// Проверяем подключение к базе данных
 	if err := c.db.PingContext(dbCtx); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "Database connection failed")
 		// База данных недоступна - возвращаем 500 для перезапуска
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "Database connection failed")
 	}
@@ -109,6 +113,7 @@ func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) error {
 		dbStatus = "error"
 		healthStatus = "unhealthy"
 		statusCode = fiber.StatusInternalServerError
+		c.logger.ErrorCtx(ctx.Context(), "Database connection failed")
 	} else {
 		healthStatus = "healthy"
 		statusCode = fiber.StatusOK
@@ -118,6 +123,7 @@ func (c *Controller) GetHealthDetailed(ctx *fiber.Ctx) error {
 		Status:   healthStatus,
 		Database: dbStatus,
 	}); err != nil {
+		c.logger.ErrorCtx(ctx.Context(), "error returning health status")
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, "error returning health status")
 	}
 	return nil
